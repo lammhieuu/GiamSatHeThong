@@ -1,0 +1,193 @@
+body { 
+  background:#1b1b2f; 
+  color:#fff; 
+  font-family:Arial,sans-serif; 
+  margin:0;
+  padding:0;
+}
+
+.no-clients { 
+  text-align:center; 
+  font-size:18px; 
+  margin-top:50px; 
+}
+
+.machine-table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0 10px;
+  text-align:center;
+  font-size:14px;
+}
+
+.machine-table thead tr { 
+  background:#1976d2; 
+  color:#fff; 
+  border-radius:8px; 
+}
+
+.machine-table th, .machine-table td{
+  padding:10px;
+  overflow:visible;
+  white-space:normal; /* full IP/hostname */
+  text-overflow:clip;
+}
+
+.machine-row{
+  background:#2a2a40;
+  border-radius:8px;
+  box-shadow:0 2px 5px rgba(0,0,0,.3);
+}
+
+.table-controls{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  margin-bottom:12px;
+}
+
+.btn{
+  background:#3a3a5e;
+  color:#fff;
+  border:none;
+  padding:8px 12px;
+  border-radius:6px;
+  cursor:pointer;
+  min-width:72px;
+  transition: background 0.2s;
+}
+.btn:hover { opacity:0.9; }
+
+.btn.primary{ background:#1976d2; }
+.btn.danger{ background:#c62828; }
+
+.disk-progress-column{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+  max-width:240px;
+  max-height:140px;
+  overflow:auto;
+}
+
+.disk-progress-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.circular-progress{ display:block; }
+
+/* ================= Modal ================= */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right:0; bottom:0;
+  background: rgba(0,0,0,0.6);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index: 999;
+}
+
+.modal {
+  background:#2a2a40;
+  padding:20px;
+  border-radius:12px;
+  min-width:300px;
+  max-width:400px;
+  color:#fff;
+  box-shadow:0 5px 15px rgba(0,0,0,0.5);
+}
+
+.modal h3 { margin-top:0; margin-bottom:16px; text-align:center; }
+
+.modal label {
+  display:block;
+  margin-bottom:8px;
+  font-size:14px;
+}
+
+.modal input {
+  width:100%;
+  margin-top:4px;
+  margin-bottom:12px;
+  padding:6px 8px;
+  border-radius:6px;
+  border:1px solid #555;
+  background:#1b1b2f;
+  color:#fff;
+}
+
+.modal input:focus {
+  outline:none;
+  border-color:#1976d2;
+}
+
+.modal-buttons {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:8px;
+}
+@keyframes blink-light {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.blink-light {
+  animation: blink-light 1s infinite;
+}
+
+.machine-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px; /* khoảng cách giữa các row */
+  text-align: center;
+  font-size: 14px;
+}
+
+.machine-table th, .machine-table td {
+  padding: 14px 12px; /* tăng padding để bảng to hơn */
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.machine-row {
+  background: #2a2a40;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,.3);
+  height: 60px; /* row cao hơn */
+}
+
+.machine-table thead tr {
+  background: #1976d2;
+  color: #fff;
+  border-radius: 10px;
+  height: 50px; /* header cao hơn */
+}
+
+.disk-progress-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 260px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.disk-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center;   
+  gap: 6px;              
+  height: 100%;           
+}

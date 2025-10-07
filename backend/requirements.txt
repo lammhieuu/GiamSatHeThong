@@ -1,0 +1,4 @@
+#GIAM_SAT_HE_THONG\backend\requirements.txt
+fastapi
+python-socketio[asyncio_server]
+uvicorn

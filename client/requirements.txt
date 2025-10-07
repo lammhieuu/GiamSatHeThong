@@ -1,0 +1,3 @@
+#GIAM_SAT_HE_THONG\client\requirements.txt
+psutil
+python-socketio[client]
