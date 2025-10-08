@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 import "./Machine.css";
 import { MachineTable } from "./MachineTable";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:4001";
 const socket = io(API_BASE, { transports: ["websocket"] });
 
 export default function MachineList() {
