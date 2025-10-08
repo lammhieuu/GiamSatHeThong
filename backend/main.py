@@ -9,15 +9,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from datetime import datetime
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+origins = [
+    "https://monitor.lcit.vn:8000", 
+    "http://localhost:8000",       
+    "http://127.0.0.1:8000",
+    "http://192.168.251.32:3002"
+]
+
+sio = socketio.AsyncServer(
+    async_mode="asgi",
+    cors_allowed_origins=origins
+)
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
 socket_app = socketio.ASGIApp(sio, app)
+
 
 connection_string = "mongodb+srv://lammhieuu_db_user:scm123456@server.2bf1k73.mongodb.net/?retryWrites=true&w=majority&appName=Server"
 mongo_client = MongoClient(connection_string)
@@ -167,5 +181,6 @@ if __name__ == "__main__":
     import uvicorn
     loop = asyncio.get_event_loop()
     loop.create_task(_local_reporter_task(5.0))
-    print("Starting backend on 0.0.0.0:8000")
-    uvicorn.run(socket_app, host="0.0.0.0", port=8000, reload=True)
+    print("Starting backend on 0.0.0.0:3000")
+    uvicorn.run(socket_app, host="0.0.0.0", port=3000, reload=True)
+
