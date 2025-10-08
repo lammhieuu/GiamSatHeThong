@@ -182,6 +182,6 @@ if __name__ == "__main__":
     import uvicorn
     loop = asyncio.get_event_loop()
     loop.create_task(_local_reporter_task(5.0))
-    print("Starting backend on 0.0.0.0:3000")
-    uvicorn.run(socket_app, host="0.0.0.0", port=3000, reload=True)
+    print("Starting backend on 0.0.0.0:4001")
+    uvicorn.run(socket_app, host="0.0.0.0", port=4001, reload=True)
 
