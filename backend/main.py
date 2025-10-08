@@ -1,25 +1,19 @@
-# main.py
 import asyncio
 import socketio
 import psutil
 import platform
 import socket
+import uuid
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from datetime import datetime
 
-origins = [
-    "https://monitor.lcit.vn", 
-    "http://localhost:4001",       
-    "http://127.0.0.1:3000",
-    "http://192.168.251.32:3002",
-    "http://localhost:3000"
-]
+origins = ["*"]
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=origins
+    cors_allowed_origins="*"
 )
 
 app = FastAPI()
@@ -32,7 +26,6 @@ app.add_middleware(
 )
 
 socket_app = socketio.ASGIApp(sio, app)
-
 
 connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
 mongo_client = MongoClient(connection_string)
@@ -66,12 +59,10 @@ async def system_update(sid, data):
     machine_id = data.get("machine_id")
     if not machine_id:
         return
-
     old_data = clients_data.get(machine_id, {})
     merged = {**old_data, **data}
     merged["last_update"] = datetime.now().isoformat()
     clients_data[machine_id] = merged
-
     await sio.emit("update", clients_data)
     save_client_to_mongo_sync(merged)
 
@@ -134,7 +125,6 @@ async def _local_reporter_task(interval: float = 5.0):
             cpu_count = psutil.cpu_count(logical=True)
             ip_address = socket.gethostbyname(socket.gethostname())
             machine_id = hex(uuid.getnode())[2:]
-
             cpu_percent = psutil.cpu_percent(interval=None)
             ram = psutil.virtual_memory()
             disks, total_used, total_size = [], 0, 0
@@ -183,5 +173,4 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.create_task(_local_reporter_task(5.0))
     print("Starting backend on 0.0.0.0:4001")
-    uvicorn.run(socket_app, host="0.0.0.0", port=4001, reload=True)
-
+    uvicorn.run(socket_app, host="0.0.0.0", port=4001)
