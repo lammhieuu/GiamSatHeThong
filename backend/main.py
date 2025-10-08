@@ -34,7 +34,7 @@ app.add_middleware(
 socket_app = socketio.ASGIApp(sio, app)
 
 
-connection_string = "mongodb://root:UddlLaoCaiLcit@841889@192.168.251.32:27017/?authSource=admin"
+connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
