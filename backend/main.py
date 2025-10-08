@@ -11,6 +11,7 @@ from datetime import datetime
 
 origins = [
     "https://monitor.lcit.vn:8000", 
+    "https://monitor.lcit.vn", 
     "http://localhost:4001",       
     "http://127.0.0.1:3000",
     "http://192.168.251.32:3002",
@@ -34,7 +35,7 @@ app.add_middleware(
 socket_app = socketio.ASGIApp(sio, app)
 
 
-connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
+connection_string = "mongodb://root:UddlLaoCaiLcit@841889@192.168.251.32:27017/?authSource=admin"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
