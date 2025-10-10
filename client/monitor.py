@@ -1,4 +1,3 @@
-# monitor.py
 import argparse
 import os
 import psutil
@@ -8,6 +7,7 @@ import time
 import socket
 import uuid
 from datetime import datetime
+import requests
 
 sio = socketio.Client(reconnection=True)
 
@@ -59,12 +59,11 @@ def get_disk_info():
             continue
     return disks, total_used / (1024**3), total_size / (1024**3)
 
-def get_dynamic_info(static_info):
-    cpu_percent = psutil.cpu_percent(interval=None)
+def get_dynamic_info():
     ram = psutil.virtual_memory()
+    cpu_percent = psutil.cpu_percent(interval=None)
     disks, total_used, _ = get_disk_info()
     return {
-        "machine_id": static_info["machine_id"],
         "cpu_percent": cpu_percent,
         "ram_used": ram.used / (1024**3),
         "ram_total": ram.total / (1024**3),
@@ -74,17 +73,36 @@ def get_dynamic_info(static_info):
         "last_update": datetime.now().isoformat()
     }
 
+def machine_exists(machine_id):
+    try:
+        res = requests.get(f"{API_URL}/clients/{machine_id}")
+        return res.status_code == 200
+    except:
+        return False
+
 @sio.event
 def connect():
-    print("Connected to server:", API_URL)
-    try:
-        sio.emit("system_update", {**static_info, **get_dynamic_info(static_info)}, namespace="/")
-    except Exception as e:
-        print("Emit failed on connect:", e)
+    print("Connected to Server!", API_URL)
+    # Khi connect lần đầu, kiểm tra nếu chưa có trong DB thì gửi full info
+    if not machine_exists(static_info["machine_id"]):
+        full_data = {**static_info, **get_dynamic_info()}
+        sio.emit("system_update", full_data, namespace="/")
 
 @sio.event
 def disconnect():
-    print("Disconnected from server")
+    print("Disconnected from Server!")
+
+@sio.on("stop_monitor")
+def stop_monitor(data):
+    machine_id = data.get("machine_id")
+    if machine_id == static_info["machine_id"]:
+        print(f"Received stop_monitor for {machine_id}, stopping updates...")
+        global running
+        running = False
+        try:
+            sio.disconnect()
+        except:
+            pass
 
 def _connect_with_backoff(url):
     backoff = 1.0
@@ -98,17 +116,20 @@ def _connect_with_backoff(url):
             backoff = min(30, backoff * 1.5)
 
 def main():
-    global static_info
+    global static_info, running
     static_info = get_static_info()
+    running = True
 
     _connect_with_backoff(API_URL)
     print("Starting system monitor... (Ctrl+C to stop)")
 
     try:
-        while True:
+        while running:
             if not sio.connected:
                 _connect_with_backoff(API_URL)
-            dynamic_data = get_dynamic_info(static_info)
+            # Chỉ gửi dữ liệu realtime
+            dynamic_data = get_dynamic_info()
+            dynamic_data["machine_id"] = static_info["machine_id"]
             try:
                 sio.emit("system_update", dynamic_data, namespace="/")
             except Exception as e:
