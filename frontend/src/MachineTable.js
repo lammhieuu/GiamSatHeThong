@@ -1,3 +1,4 @@
+//MachineTable.js
 import React, { useState } from "react";
 import "./Machine.css";
 
@@ -17,7 +18,14 @@ export function CircularProgress({ percent, size = 50, strokeWidth = 6 }) {
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={className}>
-      <circle stroke="#e6e6e6" fill="transparent" strokeWidth={strokeWidth} r={radius} cx={size / 2} cy={size / 2} />
+      <circle
+        stroke="#e6e6e6"
+        fill="transparent"
+        strokeWidth={strokeWidth}
+        r={radius}
+        cx={size / 2}
+        cy={size / 2}
+      />
       <circle
         stroke={color}
         fill="transparent"
@@ -30,7 +38,16 @@ export function CircularProgress({ percent, size = 50, strokeWidth = 6 }) {
         strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
-      <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fontSize={size * 0.3} fontWeight="bold" fill="#fff">
+      <text
+        x="50%"
+        y="50%"
+        dominantBaseline="middle"
+        textAnchor="middle"
+        fontSize={size * 0.3}
+        fontWeight="bold"
+        fill="#000"
+        style={{ pointerEvents: "none" }}
+      >
         {percent.toFixed(0)}%
       </text>
     </svg>
@@ -40,6 +57,7 @@ export function CircularProgress({ percent, size = 50, strokeWidth = 6 }) {
 export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
+  const defaultPlatforms = ["VNPT Cloud", "Viettel Cloud", "TTCNTT LC"];
 
   if (!clients || Object.keys(clients).length === 0) {
     return <p className="no-clients">No clients connected</p>;
@@ -50,10 +68,11 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
       <table className="machine-table">
         <thead>
           <tr>
-            <th>ID máy</th>
+            <th>ID</th>
             <th>Tên máy chủ</th>
             <th>HDH</th>
             <th>IP</th>
+            <th>Nền tảng</th>
             <th>CPU (Core)</th>
             <th>RAM</th>
             <th>DISK (Tổng)</th>
@@ -69,53 +88,82 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
             const isEditing = editId === id;
             return (
               <tr key={id} className="machine-row">
-                <td>{info.machine_id}</td>
-
+                <td>{id}</td>
                 <td>
                   {isEditing ? (
                     <input
                       value={editData.hostname || ""}
-                      onChange={(e) => setEditData({ ...editData, hostname: e.target.value })}
-                      onKeyDown={(e) => e.key === "Enter" && onUpdate(info.machine_id, editData)}
+                      onChange={(e) =>
+                        setEditData({ ...editData, hostname: e.target.value })
+                      }
+                      onKeyDown={(e) => e.key === "Enter" && onUpdate(id, editData)}
                     />
                   ) : (
                     info.hostname
                   )}
                 </td>
-
                 <td>{info.os}</td>
-
                 <td>
                   {isEditing ? (
                     <input
                       value={editData.ip || ""}
-                      onChange={(e) => setEditData({ ...editData, ip: e.target.value })}
-                      onKeyDown={(e) => e.key === "Enter" && onUpdate(info.machine_id, editData)}
+                      onChange={(e) =>
+                        setEditData({ ...editData, ip: e.target.value })
+                      }
+                      onKeyDown={(e) => e.key === "Enter" && onUpdate(id, editData)}
                     />
                   ) : (
                     info.ip
                   )}
                 </td>
-
-                <td>{info.cpu_count || 0}</td>
                 <td>
-                  {Number(info.ram_used || 0).toFixed(1)} / {Number(info.ram_total || 0).toFixed(1)} GB
+                  {isEditing ? (
+                    <>
+                      <select
+                        value={defaultPlatforms.includes(editData.platform) ? editData.platform : ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "other") {
+                            setEditData({ ...editData, platform: "" });
+                          } else {
+                            setEditData({ ...editData, platform: value });
+                          }
+                        }}
+                      >
+                        <option value="">-- Chọn nền tảng --</option>
+                        {defaultPlatforms.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                        <option value="other">Khác...</option>
+                      </select>
+                      {!defaultPlatforms.includes(editData.platform) && (
+                        <input
+                          placeholder="Nhập nền tảng mới"
+                          value={editData.platform || ""}
+                          onChange={(e) =>
+                            setEditData({ ...editData, platform: e.target.value })
+                          }
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && onUpdate(id, editData)
+                          }
+                        />
+                      )}
+                    </>
+                  ) : (
+                    info.platform || "-"
+                  )}
                 </td>
+                <td>{info.cpu_count || 0}</td>
+                <td>{Number(info.ram_total || 0).toFixed(1)} GB</td>
                 <td>
                   {Number(info.disk_used || 0).toFixed(1)} / {Number(info.disk_total || 0).toFixed(1)} GB
                 </td>
-                <td>
-                  <CircularProgress percent={Number(info.cpu_percent || 0)} />
-                </td>
-                <td>
-                  <CircularProgress percent={Number(info.ram_percent || 0)} />
-                </td>
+                <td><CircularProgress percent={Number(info.cpu_percent || 0)} /></td>
+                <td><CircularProgress percent={Number(info.ram_percent || 0)} /></td>
                 <td className="disk-progress-column">
                   {(info.disks || []).map((d) => (
                     <div key={d.mount} className="disk-progress-item">
-                      <span>
-                        {d.mount}: {Number(d.used || 0).toFixed(1)} / {Number(d.total || 0).toFixed(1)}
-                      </span>
+                      <span>{d.mount}: {Number(d.used || 0).toFixed(1)} / {Number(d.total || 0).toFixed(1)}</span>
                       <CircularProgress percent={Number(d.percent || 0)} size={50} strokeWidth={6} />
                     </div>
                   ))}
@@ -124,40 +172,21 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
                 <td className="action-buttons">
                   {isEditing ? (
                     <>
-                      <button
-                        className="btn success"
-                        onClick={() => {
-                          onUpdate(info.machine_id, editData);
-                          setEditId(null);
-                        }}
-                      >
-                        Save
-                      </button>
-                      <button className="btn" onClick={() => setEditId(null)}>
-                        Cancel
-                      </button>
+                      <button className="btn success" onClick={() => { onUpdate(id, editData); setEditId(null); }}>Save</button>
+                      <button className="btn" onClick={() => setEditId(null)}>Cancel</button>
                     </>
                   ) : (
                     <>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setEditId(id);
-                          setEditData({ hostname: info.hostname, ip: info.ip });
-                        }}
-                      >
-                        Edit
-                      </button>
-                      {typeof onSave === "function" && (
-                        <button className="btn primary" onClick={() => onSave(info.machine_id)}>
-                          Save
-                        </button>
-                      )}
-                      {typeof onDelete === "function" && (
-                        <button className="btn danger" onClick={() => onDelete(info.machine_id)}>
-                          Delete
-                        </button>
-                      )}
+                      <button className="btn" onClick={() => {
+                        setEditId(id);
+                        setEditData({
+                          hostname: info.hostname,
+                          ip: info.ip,
+                          platform: info.platform || "",
+                        });
+                      }}>Edit</button>
+                      {typeof onSave === "function" && <button className="btn primary" onClick={() => onSave(id)}>Save</button>}
+                      {typeof onDelete === "function" && <button className="btn danger" onClick={() => onDelete(id)}>Delete</button>}
                     </>
                   )}
                 </td>

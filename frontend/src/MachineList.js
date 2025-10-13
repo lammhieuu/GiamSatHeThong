@@ -1,3 +1,4 @@
+//MachineList.js
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import "./Machine.css";
@@ -22,15 +23,16 @@ export default function MachineList() {
 
   const handleSave = async (id) => {
     try {
-      const clientData = clients[id];
+      const clientData = { ...clients[id] };
       if (!clientData) return;
+      delete clientData._id; // Loại bỏ _id hoàn toàn
       const res = await fetch(`${API_BASE}/save/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
       });
       if (!res.ok) throw new Error(await res.text());
-      // alert(`Client ${id} saved successfully!`);
+      // alert("Save successful");
     } catch (err) {
       alert("Save failed: " + err.message);
     }
@@ -41,7 +43,7 @@ export default function MachineList() {
     try {
       const res = await fetch(`${API_BASE}/clients/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(await res.text());
-      // alert(`Client ${id} deleted successfully!`);
+      // alert("Delete successful");
     } catch (err) {
       alert("Delete failed: " + err.message);
     }
@@ -49,17 +51,26 @@ export default function MachineList() {
 
   const handleUpdate = async (machine_id, newData) => {
     try {
+      const payload = { ...newData };
+      delete payload._id; // Loại bỏ _id hoàn toàn
       const res = await fetch(`${API_BASE}/update/${machine_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newData),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
-      // alert(`Client ${machine_id} updated successfully!`);
+      // alert("Update successful");
     } catch (err) {
       alert("Update failed: " + err.message);
     }
   };
 
-  return <MachineTable clients={clients} onSave={handleSave} onDelete={handleDelete} onUpdate={handleUpdate} />;
+  return (
+    <MachineTable
+      clients={clients}
+      onSave={handleSave}
+      onDelete={handleDelete}
+      onUpdate={handleUpdate}
+    />
+  );
 }

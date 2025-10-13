@@ -12,7 +12,7 @@ import requests
 sio = socketio.Client(reconnection=True)
 
 def _get_default_api():
-    return os.getenv("MONITOR_API_URL", "http://localhost:4001")
+    return os.getenv("MONITOR_API_URL", "https://monitor.lcit.vn:4001")
 
 parser = argparse.ArgumentParser(description="Lightweight system monitor client")
 parser.add_argument("--api", "-a", help="Backend API URL", default=_get_default_api())
@@ -117,11 +117,8 @@ def main():
             if not sio.connected:
                 _connect_with_backoff(API_URL)
 
-            # Lấy dynamic data
             dynamic_data = get_dynamic_info()
             dynamic_data["machine_id"] = static_info["machine_id"]
-
-            # --- Kiểm tra backend trực tiếp trước mỗi lần gửi
             try:
                 res = requests.get(f"{API_URL}/clients/{static_info['machine_id']}", timeout=1)
                 exists = res.status_code == 200
@@ -129,11 +126,9 @@ def main():
                 exists = False
 
             if exists:
-                # Máy đã có trong DB → chỉ gửi realtime fields
                 data_to_send = dynamic_data
                 print("Machine exists, sending only dynamic data")
             else:
-                # Máy chưa có → gửi full data
                 data_to_send = {**static_info, **dynamic_data}
                 print("Machine not found in backend, sending full data")
 
