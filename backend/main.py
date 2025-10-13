@@ -1,13 +1,16 @@
 import asyncio
 import socketio
 import psutil
+import platform
+import socket
+import uuid
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from datetime import datetime
 
 origins = [
-    "https://monitor.lcit.vn:8000",
+    "https://monitor.lcit.vn:4001",
     "http://localhost:4001",
     "http://127.0.0.1:3000",
     "http://192.168.10.43:4001",
@@ -26,7 +29,7 @@ app.add_middleware(
 )
 socket_app = socketio.ASGIApp(sio, app)
 
-connection_string = "mongodb+srv://lammhieuu_db_user:scm123456@server.2bf1k73.mongodb.net/?retryWrites=true&w=majority&appName=Server"
+connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
@@ -37,7 +40,6 @@ def save_client_to_mongo_sync(client_data):
         return
     return collection.update_one({"machine_id": machine_id}, {"$set": client_data}, upsert=True)
 
-# --- Load clients từ DB (cache khi backend start)
 def load_clients_from_db():
     clients = {}
     for doc in collection.find():
@@ -59,7 +61,6 @@ def make_serializable(data):
         result[k] = v_copy
     return result
 
-# --- SocketIO events
 @sio.event
 async def connect(sid, environ, auth=None):
     await sio.emit("update", make_serializable(clients_data))
@@ -74,10 +75,8 @@ async def system_update(sid, data):
     if not machine_id:
         return
 
-    # --- Kiểm tra trực tiếp DB
     db_doc = collection.find_one({"machine_id": machine_id})
     if db_doc:
-        # Máy đã tồn tại → chỉ cập nhật realtime fields
         dynamic_fields = ["cpu_percent", "ram_used", "ram_total", "ram_percent", "disk_used", "disks", "last_update"]
         for field in dynamic_fields:
             if field in data:
@@ -85,7 +84,6 @@ async def system_update(sid, data):
         clients_data[machine_id] = db_doc
         save_client_to_mongo_sync(db_doc)
     else:
-        # Máy chưa tồn tại → lưu full data
         data.setdefault("platform", "-")
         data.setdefault("last_update", datetime.now().isoformat())
         clients_data[machine_id] = data
@@ -93,7 +91,6 @@ async def system_update(sid, data):
 
     await sio.emit("update", make_serializable(clients_data))
 
-# --- API routes
 @app.get("/clients")
 async def get_clients():
     return make_serializable(clients_data)
@@ -113,7 +110,6 @@ async def delete_client(client_id: str):
         raise HTTPException(404, "client not found")
     clients_data.pop(client_id)
     collection.delete_one({"machine_id": client_id})
-    # Chỉ emit stop_monitor khi thực sự xóa client
     await sio.emit("stop_monitor", {"machine_id": client_id})
     await sio.emit("update", make_serializable(clients_data))
     return {"result": "deleted", "id": client_id}
@@ -126,8 +122,7 @@ async def save_client_api(client_id: str, payload: dict = Body(...)):
         payload["last_update"] = datetime.now().isoformat()
     old_data = clients_data.get(client_id, {})
     merged = {**old_data, **payload}
-    if "platform" not in merged:
-        merged["platform"] = "-"
+    merged.setdefault("platform", "-")
     clients_data[client_id] = merged
     save_client_to_mongo_sync(merged)
     await sio.emit("update", make_serializable(clients_data))
@@ -141,8 +136,7 @@ async def update_client(client_id: str, payload: dict = Body(...)):
         payload["last_update"] = datetime.now().isoformat()
     old_data = clients_data.get(client_id, {})
     merged = {**old_data, **payload}
-    if "platform" not in merged:
-        merged["platform"] = "-"
+    merged.setdefault("platform", "-")
     clients_data[client_id] = merged
     save_client_to_mongo_sync(merged)
     await sio.emit("update", make_serializable(clients_data))
@@ -163,14 +157,12 @@ async def health():
 async def root():
     return {"service": "system-monitor-backend", "clients": len(clients_data)}
 
-# --- Local reporter task
 async def _local_reporter_task(interval: float = 5.0):
     while True:
         try:
             if not clients_data:
                 await asyncio.sleep(interval)
                 continue
-
             for machine_id in list(clients_data.keys()):
                 client = clients_data[machine_id]
                 cpu_percent = psutil.cpu_percent(interval=None)
@@ -190,7 +182,6 @@ async def _local_reporter_task(interval: float = 5.0):
                         total_size += usage.total
                     except:
                         continue
-
                 dynamic_data = {
                     "cpu_percent": cpu_percent,
                     "ram_used": ram.used / (1024**3),
@@ -200,10 +191,8 @@ async def _local_reporter_task(interval: float = 5.0):
                     "disks": disks,
                     "last_update": datetime.now().isoformat()
                 }
-
                 for field in dynamic_data:
                     client[field] = dynamic_data[field]
-
                 clients_data[machine_id] = client
                 save_client_to_mongo_sync(client)
             await sio.emit("update", make_serializable(clients_data))
