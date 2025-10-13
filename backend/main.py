@@ -1,14 +1,12 @@
 import asyncio
 import socketio
 import psutil
-import platform
-import socket
-import uuid
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from datetime import datetime
 
+# --- Cấu hình CORS ---
 origins = [
     "https://monitor.lcit.vn:4001",
     "https://monitor.lcit.vn:8000",
@@ -19,6 +17,7 @@ origins = [
     "http://localhost:3000"
 ]
 
+# --- Khởi tạo SocketIO + FastAPI ---
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=origins)
 app = FastAPI()
 app.add_middleware(
@@ -35,27 +34,9 @@ mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
 
-def save_client_to_mongo_sync(client_data):
-    machine_id = client_data.get("machine_id")
-    if not machine_id:
-        return
-    return collection.update_one({"machine_id": machine_id}, {"$set": client_data}, upsert=True)
-
-def load_clients_from_db():
-    clients = {}
-    for doc in collection.find():
-        machine_id = doc.get("machine_id")
-        if machine_id:
-            doc.setdefault("platform", "-")
-            doc.setdefault("last_update", datetime.now().isoformat())
-            clients[machine_id] = doc
-    return clients
-
-clients_data = load_clients_from_db()
-
-def make_serializable(data):
+def make_serializable(clients):
     result = {}
-    for k, v in data.items():
+    for k, v in clients.items():
         v_copy = v.copy()
         if "_id" in v_copy:
             v_copy["_id"] = str(v_copy["_id"])
@@ -64,11 +45,13 @@ def make_serializable(data):
 
 @sio.event
 async def connect(sid, environ, auth=None):
-    await sio.emit("update", make_serializable(clients_data))
+    all_clients = {doc["machine_id"]: doc for doc in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
 
 @sio.event
 async def disconnect(sid):
-    await sio.emit("update", make_serializable(clients_data))
+    all_clients = {doc["machine_id"]: doc for doc in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
 
 @sio.event
 async def system_update(sid, data):
@@ -79,75 +62,68 @@ async def system_update(sid, data):
     db_doc = collection.find_one({"machine_id": machine_id})
     if db_doc:
         dynamic_fields = ["cpu_percent", "ram_used", "ram_total", "ram_percent", "disk_used", "disks", "last_update"]
-        for field in dynamic_fields:
-            if field in data:
-                db_doc[field] = data[field]
-        clients_data[machine_id] = db_doc
-        save_client_to_mongo_sync(db_doc)
+        update_data = {field: data[field] for field in dynamic_fields if field in data}
+        collection.update_one({"machine_id": machine_id}, {"$set": update_data})
     else:
         data.setdefault("platform", "-")
         data.setdefault("last_update", datetime.now().isoformat())
-        clients_data[machine_id] = data
-        save_client_to_mongo_sync(data)
+        collection.insert_one(data)
 
-    await sio.emit("update", make_serializable(clients_data))
+    all_clients = {doc["machine_id"]: doc for doc in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
 
+# --- API ---
 @app.get("/clients")
 async def get_clients():
-    return make_serializable(clients_data)
+    all_clients = {doc["machine_id"]: doc for doc in collection.find()}
+    return make_serializable(all_clients)
 
 @app.get("/clients/{client_id}")
 async def get_client(client_id: str):
-    if client_id not in clients_data:
+    doc = collection.find_one({"machine_id": client_id})
+    if not doc:
         raise HTTPException(404, "client not found")
-    item = clients_data[client_id].copy()
-    if "_id" in item:
-        item["_id"] = str(item["_id"])
-    return item
+    if "_id" in doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
 
 @app.delete("/clients/{client_id}")
 async def delete_client(client_id: str):
-    if client_id not in clients_data:
+    doc = collection.find_one({"machine_id": client_id})
+    if not doc:
         raise HTTPException(404, "client not found")
-    clients_data.pop(client_id)
     collection.delete_one({"machine_id": client_id})
     await sio.emit("stop_monitor", {"machine_id": client_id})
-    await sio.emit("update", make_serializable(clients_data))
+    all_clients = {d["machine_id"]: d for d in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
     return {"result": "deleted", "id": client_id}
 
 @app.post("/save/{client_id}")
 async def save_client_api(client_id: str, payload: dict = Body(...)):
     if not payload:
         raise HTTPException(400, "No client data sent")
-    if "last_update" not in payload:
-        payload["last_update"] = datetime.now().isoformat()
-    old_data = clients_data.get(client_id, {})
-    merged = {**old_data, **payload}
-    merged.setdefault("platform", "-")
-    clients_data[client_id] = merged
-    save_client_to_mongo_sync(merged)
-    await sio.emit("update", make_serializable(clients_data))
+    payload.setdefault("last_update", datetime.now().isoformat())
+    payload.setdefault("platform", "-")
+    collection.update_one({"machine_id": client_id}, {"$set": payload}, upsert=True)
+    all_clients = {d["machine_id"]: d for d in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
     return {"result": "saved", "id": client_id}
 
 @app.put("/update/{client_id}")
 async def update_client(client_id: str, payload: dict = Body(...)):
     if not payload:
         raise HTTPException(400, "No client data sent")
-    if "last_update" not in payload:
-        payload["last_update"] = datetime.now().isoformat()
-    old_data = clients_data.get(client_id, {})
-    merged = {**old_data, **payload}
-    merged.setdefault("platform", "-")
-    clients_data[client_id] = merged
-    save_client_to_mongo_sync(merged)
-    await sio.emit("update", make_serializable(clients_data))
+    payload.setdefault("last_update", datetime.now().isoformat())
+    payload.setdefault("platform", "-")
+    collection.update_one({"machine_id": client_id}, {"$set": payload}, upsert=True)
+    all_clients = {d["machine_id"]: d for d in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
     return {"result": "updated", "id": client_id}
 
 @app.post("/refresh_clients")
 async def refresh_clients():
-    global clients_data
-    clients_data = load_clients_from_db()
-    await sio.emit("update", make_serializable(clients_data))
+    all_clients = {d["machine_id"]: d for d in collection.find()}
+    await sio.emit("update", make_serializable(all_clients))
     return {"status": "refreshed"}
 
 @app.get("/health")
@@ -156,16 +132,14 @@ async def health():
 
 @app.get("/")
 async def root():
-    return {"service": "system-monitor-backend", "clients": len(clients_data)}
+    total = collection.count_documents({})
+    return {"service": "system-monitor-backend", "clients": total}
 
 async def _local_reporter_task(interval: float = 5.0):
     while True:
         try:
-            if not clients_data:
-                await asyncio.sleep(interval)
-                continue
-            for machine_id in list(clients_data.keys()):
-                client = clients_data[machine_id]
+            for doc in collection.find():
+                machine_id = doc["machine_id"]
                 cpu_percent = psutil.cpu_percent(interval=None)
                 ram = psutil.virtual_memory()
                 disks, total_used, total_size = [], 0, 0
@@ -192,11 +166,9 @@ async def _local_reporter_task(interval: float = 5.0):
                     "disks": disks,
                     "last_update": datetime.now().isoformat()
                 }
-                for field in dynamic_data:
-                    client[field] = dynamic_data[field]
-                clients_data[machine_id] = client
-                save_client_to_mongo_sync(client)
-            await sio.emit("update", make_serializable(clients_data))
+                collection.update_one({"machine_id": machine_id}, {"$set": dynamic_data})
+            all_clients = {d["machine_id"]: d for d in collection.find()}
+            await sio.emit("update", make_serializable(all_clients))
         except Exception as e:
             print("Reporter error:", e)
         await asyncio.sleep(interval)
