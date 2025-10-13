@@ -10,6 +10,7 @@ from datetime import datetime
 origins = [
     "https://monitor.lcit.vn:4001",
     "https://monitor.lcit.vn:8000",
+    "https://monitor.lcit.vn",
     "http://localhost:4001",
     "http://127.0.0.1:3000",
     "http://192.168.10.43:4001",

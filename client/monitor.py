@@ -13,7 +13,7 @@ sio = socketio.Client(reconnection=True)
 
 # --- Cấu hình backend API ---
 def _get_default_api():
-    return os.getenv("MONITOR_API_URL", "http://monitor.lcit.vn:4001")
+    return os.getenv("MONITOR_API_URL", "https://monitor.lcit.vn:4001")
 
 parser = argparse.ArgumentParser(description="Lightweight system monitor client")
 parser.add_argument("--api", "-a", help="Backend API URL", default=_get_default_api())
