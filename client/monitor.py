@@ -29,16 +29,16 @@ def get_static_info():
         ip_address = socket.gethostbyname(socket.gethostname())
     except:
         ip_address = "127.0.0.1"
-    machine_id = hex(uuid.getnode())[2:]
     disks, total_used, total_size = get_disk_info()
     return {
-        "machine_id": machine_id,
+        "machine_id": hex(uuid.getnode())[2:],
         "hostname": hostname,
         "os": platform.system() + " " + platform.release(),
         "ip": ip_address,
         "cpu_count": cpu_count,
         "disk_total": total_size,
-        "disks": disks
+        "disks": disks,
+        "platform": "-"
     }
 
 def get_disk_info():
@@ -73,20 +73,9 @@ def get_dynamic_info():
         "last_update": datetime.now().isoformat()
     }
 
-def machine_exists(machine_id):
-    try:
-        res = requests.get(f"{API_URL}/clients/{machine_id}")
-        return res.status_code == 200
-    except:
-        return False
-
 @sio.event
 def connect():
     print("Connected to Server!", API_URL)
-    # Khi connect lần đầu, kiểm tra nếu chưa có trong DB thì gửi full info
-    if not machine_exists(static_info["machine_id"]):
-        full_data = {**static_info, **get_dynamic_info()}
-        sio.emit("system_update", full_data, namespace="/")
 
 @sio.event
 def disconnect():
@@ -96,9 +85,9 @@ def disconnect():
 def stop_monitor(data):
     machine_id = data.get("machine_id")
     if machine_id == static_info["machine_id"]:
-        print(f"Received stop_monitor for {machine_id}, stopping updates...")
         global running
         running = False
+        print("Received stop_monitor, exiting...")
         try:
             sio.disconnect()
         except:
@@ -127,14 +116,34 @@ def main():
         while running:
             if not sio.connected:
                 _connect_with_backoff(API_URL)
-            # Chỉ gửi dữ liệu realtime
+
+            # Lấy dynamic data
             dynamic_data = get_dynamic_info()
             dynamic_data["machine_id"] = static_info["machine_id"]
+
+            # --- Kiểm tra backend trực tiếp trước mỗi lần gửi
             try:
-                sio.emit("system_update", dynamic_data, namespace="/")
+                res = requests.get(f"{API_URL}/clients/{static_info['machine_id']}", timeout=1)
+                exists = res.status_code == 200
+            except:
+                exists = False
+
+            if exists:
+                # Máy đã có trong DB → chỉ gửi realtime fields
+                data_to_send = dynamic_data
+                print("Machine exists, sending only dynamic data")
+            else:
+                # Máy chưa có → gửi full data
+                data_to_send = {**static_info, **dynamic_data}
+                print("Machine not found in backend, sending full data")
+
+            try:
+                sio.emit("system_update", data_to_send, namespace="/")
             except Exception as e:
                 print("Emit failed:", e)
+
             time.sleep(SEND_INTERVAL)
+
     except KeyboardInterrupt:
         print("Stopping monitor...")
         try:
