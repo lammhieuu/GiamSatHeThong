@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import "./Machine.css";
 import { MachineTable } from "./MachineTable";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:4001";
+const API_BASE = "https://monitor.lcit.vn:4001";
 const socket = io(API_BASE, { transports: ["websocket"] });
 
 export default function MachineList() {
@@ -41,7 +41,9 @@ export default function MachineList() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete client?")) return;
     try {
-      const res = await fetch(`${API_BASE}/clients/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/clients/${id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error(await res.text());
       // alert("Delete successful");
     } catch (err) {
