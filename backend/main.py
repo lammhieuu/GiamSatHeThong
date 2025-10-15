@@ -1,3 +1,4 @@
+#main.py
 import asyncio
 import socketio
 import psutil
@@ -18,7 +19,6 @@ origins = [
     "http://localhost:3000"
 ]
 
-# --- Khởi tạo SocketIO + FastAPI ---
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=origins)
 app = FastAPI()
 app.add_middleware(
@@ -30,7 +30,7 @@ app.add_middleware(
 )
 socket_app = socketio.ASGIApp(sio, app)
 
-connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
+connection_string = "mongodb+srv://lammhieuu_db_user:scm123456@server.2bf1k73.mongodb.net/?retryWrites=true&w=majority&appName=Server"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
@@ -126,6 +126,21 @@ async def refresh_clients():
     all_clients = {d["machine_id"]: d for d in collection.find()}
     await sio.emit("update", make_serializable(all_clients))
     return {"status": "refreshed"}
+
+@app.post("/login")
+async def login(payload: dict = Body(...)):
+    tk = payload.get("tk")
+    mk = payload.get("mk")
+    if not tk or not mk:
+        raise HTTPException(400, "Missing credentials")
+
+    DEFAULT_USERNAME = "admin"
+    DEFAULT_PASSWORD = "123456"
+
+    if tk != DEFAULT_USERNAME or mk != DEFAULT_PASSWORD:
+        raise HTTPException(401, "Invalid username or password")
+
+    return {"status": "ok", "tk": tk}
 
 @app.get("/health")
 async def health():

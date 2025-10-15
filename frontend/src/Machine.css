@@ -1,21 +1,47 @@
 /* Machine.css */
+
+/* BODY */
 body { 
-  background: #fffffe; /* siêu nhạt vàng giấy hơn */
-  color: #000;
-  font-family: "Patrick Hand", cursive, Arial, sans-serif;
   margin: 0;
   padding: 0;
-  background-image: radial-gradient(#000 1px, transparent 1px);
-  background-size: 20px 20px;
+  font-family: "Orbitron", "Segoe UI", Arial, sans-serif;
+  color: #e0f7ff;
+  overflow-x: auto; 
+  background: radial-gradient(circle at center, 
+              rgba(0, 200, 255, 0.4) 0%, 
+              rgba(0, 100, 255, 0.2) 25%, 
+              rgba(0, 0, 40, 0.9) 60%, 
+              rgba(0, 0, 0, 1) 100%);
+  background-attachment: fixed;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: 
+    linear-gradient(90deg, rgba(0,200,255,0.15) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0,200,255,0.15) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+  animation: scan 6s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes scan {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 60px 60px, 0 60px; }
 }
 
 .no-clients {
   text-align: center;
-  font-size: 18px;
-  margin-top: 50px;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.2s;
+  font-size: 20px;
+  margin-top: 60px;
+  color: #00c8ff;
+  text-shadow: 0 0 8px #00c8ff, 0 0 15px #0066ff;
+  opacity: 1;
 }
 
 .machine-table {
@@ -24,272 +50,357 @@ body {
   border-spacing: 0 12px;
   text-align: center;
   font-size: 14px;
-  border: 3px solid #000;
-  box-shadow: 4px 4px 0 #000;
+  border: 2px solid #00c8ff;
+  box-shadow: 0 0 12px rgba(0, 200, 255, 0.5);
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .machine-table thead tr {
-  background: linear-gradient(135deg, #fffaf0 40%, #fff5e0 60%, #fffaf0 100%);
-  color: #000;
-  border-bottom: 3px solid #000;
-  font-family: "Patrick Hand", cursive, Arial, sans-serif;
-  position: relative;
-  overflow: hidden;
+  background: linear-gradient(135deg, rgba(0, 200, 255, 0.2), rgba(0, 100, 200, 0.4));
+  color: #fff;
+  border-bottom: 2px solid #00c8ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  text-shadow: 0 0 8px #00eaff;
 }
 
 .machine-table thead th {
   padding: 14px 12px;
-  border: 2px solid #000;
-  background: linear-gradient(135deg, #fffaf0, #fff5e0, #fffaf0);
-  color: #000;
+  border: 1px solid rgba(0,200,255,0.5);
+  background: rgba(0, 30, 60, 0.7);
+  color: #00eaff;
   position: relative;
-  z-index: 1;
-  mix-blend-mode: normal;
-  background-clip: padding-box;
-  -webkit-background-clip: padding-box;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  transition: transform 0.2s;
-  
-  /* hiệu ứng nét vẽ tay */
-  box-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
-  clip-path: polygon(
-    0% 0%, 100% 0%, 100% 90%, 95% 100%, 5% 100%, 0% 90%
-  );
-}
-
-.machine-table thead th::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(0,0,0,0.03),
-    rgba(0,0,0,0.03) 4px,
-    transparent 4px,
-    transparent 8px
-  );
-  pointer-events: none;
+  opacity: 1;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 0 10px rgba(0,200,255,0.2);
 }
 
 .machine-table thead th:hover {
-  transform: scale(1.05) rotate(-0.5deg);
-  background: linear-gradient(135deg, #fffaf0 30%, #eee8d5 50%, #fffaf0 70%);
-  box-shadow: 3px 3px 0 #000, -2px -2px 0 #000;
+  transform: scale(1.05);
+  color: #fff;
+  text-shadow: 0 0 12px #00eaff, 0 0 20px #0090ff;
+  box-shadow: 0 0 20px rgba(0,200,255,0.6);
 }
 
 .machine-table th,
 .machine-table td {
   padding: 14px 12px;
-  border: 2px solid #000;
-  background: #fffaf0;
-  color: #000;
-  position: relative;
-  z-index: 1;
-  mix-blend-mode: normal;
-  background-clip: padding-box;
-  -webkit-background-clip: padding-box;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
+  border: 1px solid rgba(0,200,255,0.3);
+  background: rgba(0, 15, 30, 0.6);
+  color: #e0f7ff;
+  text-shadow: 0 0 6px rgba(0,200,255,0.5);
+  opacity: 1;
 }
 
-/* Delay từng cột */
-.machine-table th:nth-child(1),
-.machine-table td:nth-child(1) { animation-delay: 0.25s; }
-.machine-table th:nth-child(2),
-.machine-table td:nth-child(2) { animation-delay: 0.3s; }
-.machine-table th:nth-child(3),
-.machine-table td:nth-child(3) { animation-delay: 0.35s; }
-.machine-table th:nth-child(4),
-.machine-table td:nth-child(4) { animation-delay: 0.4s; }
-
 .machine-row {
-  background: #fffaf0;
-  border: 2px solid #000;
-  border-radius: 4px;
-  box-shadow: 3px 3px 0 #000, -1px -1px 0 #000;
+  border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 6px;
+  background: rgba(0, 25, 50, 0.6);
+  box-shadow: 0 0 10px rgba(0,200,255,0.2);
   height: 60px;
-  transition: transform 0.1s;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.45s;
+  transition: all 0.25s ease;
+  opacity: 1;
 }
 
 .machine-row:hover {
-  transform: scale(1.02) rotate(-0.5deg);
-  background: repeating-linear-gradient(
-    45deg,
-    #fffaf0,
-    #fffaf0 6px,
-    #fff5e0 6px,
-    #fff5e0 12px
-  );
-  background-clip: padding-box;
-  -webkit-background-clip: padding-box;
+  transform: scale(1.02);
+  background: rgba(0, 40, 80, 0.7);
+  box-shadow: 0 0 20px rgba(0,200,255,0.4);
 }
 
 .btn {
-  background: #fffaf0;
-  color: #000;
-  border: 2px dashed #000;
-  padding: 8px 12px;
-  border-radius: 4px;
+  background: transparent;
+  color: #00eaff;
+  border: 2px solid #00eaff;
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
-  min-width: 72px;
-  font-family: "Patrick Hand", cursive, Arial, sans-serif;
-  box-shadow: 2px 2px 0 #000;
-  transition: transform 0.1s;
-  opacity: 1; /* luôn hiển thị */
-  animation: none; /* tắt animation cho nút */
+  font-family: "Orbitron", Arial, sans-serif;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 0 8px rgba(0,200,255,0.5), inset 0 0 6px rgba(0,200,255,0.2);
+  transition: all 0.25s ease;
 }
 
 .btn:hover {
-  transform: translate(-2px, -2px) rotate(-1deg);
-  box-shadow: 4px 4px 0 #000;
-  animation: wobble 0.3s infinite;
-}
-
-.btn.primary {
-  border: 2px solid #000;
-  background: #fffaf0;
-}
-
-.btn.danger {
-  border: 2px dotted #000;
-  background: #fffaf0;
-}
-
-.disk-progress-column {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: 260px;
-  max-height: 160px;
-  overflow: auto;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.5s;
-}
-
-.disk-progress-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.55s;
+  transform: translateY(-2px) scale(1.05);
+  background: rgba(0, 200, 255, 0.1);
+  box-shadow: 0 0 20px #00eaff, 0 0 40px #0066ff;
+  color: #fff;
 }
 
 .modal-backdrop {
-  position: fixed;
-  top: 0; left: 0; right:0; bottom:0;
-  background: rgba(0,0,0,0.6);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  z-index: 999;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(6px);
 }
 
 .modal {
-  background: #fffaf0;
-  padding: 20px;
-  border: 3px solid #000;
-  border-radius: 6px;
-  min-width: 300px;
-  max-width: 400px;
-  color: #000;
-  box-shadow: 6px 6px 0 #000;
-  font-family: "Patrick Hand", cursive, Arial, sans-serif;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.6s;
+  background: rgba(0,20,40,0.9);
+  padding: 24px;
+  border: 2px solid #00eaff;
+  border-radius: 10px;
+  max-width: 420px;
+  color: #e0f7ff;
+  box-shadow: 0 0 25px rgba(0,200,255,0.6);
+  text-shadow: 0 0 8px rgba(0,200,255,0.6);
 }
 
 .modal h3 {
   margin-top: 0;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  font-size: 22px;
   text-align: center;
-  font-size: 20px;
-  border-bottom: 2px solid #000;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.65s;
-}
-
-.modal label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.7s;
+  color: #00eaff;
+  text-shadow: 0 0 12px #00eaff;
+  border-bottom: 1px solid rgba(0,200,255,0.5);
+  padding-bottom: 8px;
 }
 
 .modal input {
   width: 100%;
-  margin-top: 4px;
-  margin-bottom: 12px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border: 2px solid #000;
-  background: #fffaf0;
-  color: #000;
-  font-family: "Patrick Hand", cursive, Arial, sans-serif;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.75s;
-}
-
-.modal-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.8s;
-}
-
-@keyframes wobble {
-  0% { transform: rotate(0deg); }
-  25% { transform: rotate(0.3deg); }
-  50% { transform: rotate(-0.3deg); }
-  75% { transform: rotate(0.2deg); }
-  100% { transform: rotate(0deg); }
-}
-
-@keyframes drawLeftToRight {
-  0% { opacity: 0; transform: translateX(-20px); }
-  100% { opacity: 1; transform: translateX(0); }
-}
-
-.percent-cell {
-  font-family: Arial, sans-serif !important;
-  color: #000 !important;
-  white-space: nowrap;
-  background-clip: padding-box;
-  -webkit-background-clip: padding-box;
-  position: relative;
-  z-index: 2;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.85s;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,200,255,0.6);
+  background: rgba(0, 15, 30, 0.8);
+  color: #fff;
+  box-shadow: inset 0 0 8px rgba(0,200,255,0.3);
+  font-family: "Orbitron", Arial, sans-serif;
 }
 
 .circular-progress text {
-  fill: #000 !important;
-  font-family: Arial, sans-serif;
+  fill: #00ffff !important;
+  font-family: "Orbitron", Arial, sans-serif;
   font-weight: bold;
+  font-size: 1.1em;
   z-index: 9999;
   pointer-events: none;
-  opacity: 0;
-  animation: drawLeftToRight 0.6s forwards;
-  animation-delay: 0.9s;
+  text-shadow:
+    0 0 4px #00ffff,
+    0 0 8px #00ffff,
+    0 0 12px #00eaff,
+    0 0 20px #00eaff;
+  opacity: 1;
 }
 
-.machine-table select,
-.machine-table input {
-  opacity: 1 !important;
-  animation: none !important;
+.login-container {
+  width: 320px;
+  margin: 100px auto;
+  padding: 24px;
+  background: rgba(0, 20, 40, 0.8);
+  border: 2px solid #00eaff;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 200, 255, 0.5), inset 0 0 10px rgba(0, 200, 255, 0.2);
+  text-align: center;
+  font-family: "Orbitron", "Segoe UI", Arial, sans-serif;
+  color: #00eaff;
+  backdrop-filter: blur(6px);
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  text-shadow: 0 0 8px #00eaff, 0 0 16px #0066ff;
+  color: #00eaff;
+}
+
+.login-container input {
+  display: block;
+  width: 90%;
+  margin: 12px auto;
+  padding: 12px 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 2px solid rgba(0,200,255,0.6);
+  background: rgba(0, 10, 25, 0.85);
+  color: #00eaff;
+  box-shadow:
+    inset 0 0 8px rgba(0,200,255,0.4),
+    0 0 10px rgba(0,200,255,0.3);
+  font-family: "Orbitron", Arial, sans-serif;
+  text-shadow: 0 0 4px #00eaff;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.login-container input:focus {
+  outline: none;
+  border-color: #00ffff;
+  color: #fff;
+  background: rgba(0, 15, 30, 0.9);
+  box-shadow:
+    0 0 8px #00eaff,
+    0 0 16px #00eaff inset,
+    0 0 24px rgba(0,200,255,0.6);
+  animation: neonPulse 1.5s infinite alternate;
+}
+
+@keyframes neonPulse {
+  0% {
+    box-shadow:
+      0 0 6px #00eaff,
+      0 0 12px #00eaff inset,
+      0 0 18px rgba(0,200,255,0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 12px #00eaff,
+      0 0 24px #00eaff inset,
+      0 0 36px rgba(0,200,255,0.6);
+  }
+}
+
+.login-container input::placeholder {
+  color: rgba(0,200,255,0.6);
+  text-shadow: 0 0 4px #00eaff;
+}
+
+.login-container button {
+  width: 50%;
+  padding: 10px 0;
+  font-size: 16px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 8px;
+  border: 2px solid #00eaff;
+  background: transparent;
+  color: #00eaff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,200,255,0.5), inset 0 0 6px rgba(0,200,255,0.2);
+  transition: all 0.25s ease;
+}
+
+.login-container button:hover {
+  transform: translateY(-2px) scale(1.05);
+  background: rgba(0, 200, 255, 0.1);
+  box-shadow: 0 0 20px #00eaff, 0 0 40px #0066ff;
+  color: #fff;
+}
+
+/* ==================== LOADER ==================== */
+.loader-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loader-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  background: rgba(0, 20, 40, 0.85);
+  border: 2px solid #00eaff;
+  border-radius: 16px;
+  box-shadow:
+    0 0 20px #00eaff,
+    0 0 40px #0066ff inset,
+    0 0 60px #00ffff inset;
+  backdrop-filter: blur(6px);
+  position: relative;
+  width: 250px;
+  height: 250px;
+}
+
+.loader-container::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: 
+    linear-gradient(90deg, rgba(0,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0,255,255,0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  animation: scanBG 5s linear infinite;
+  pointer-events: none;
+  border-radius: 16px;
+}
+
+@keyframes scanBG {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 30px 30px, 0 30px; }
+}
+
+.neon-spinner {
+  width: 180px;
+  height: 180px;
+  position: relative;
+  z-index: 10;
+}
+
+.neon-spinner svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.neon-spinner .spinner-bg {
+  fill: none;
+  stroke: rgba(0, 255, 255, 0.05);
+  stroke-width: 10;
+}
+
+.neon-spinner .spinner {
+  fill: none;
+  stroke: #00ffff;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 440;
+  stroke-dashoffset: 440;
+  animation: spin 1.8s linear infinite, neonPulse 1.5s alternate infinite;
+}
+
+.neon-spinner .spinner-light {
+  fill: none;
+  stroke: #00ffff;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-dasharray: 50 390;
+  stroke-dashoffset: 0;
+  animation: spinLight 1.2s linear infinite;
+  filter: drop-shadow(0 0 10px #00ffff) drop-shadow(0 0 20px #00eaff);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); transform-origin: 50% 50%; }
+  100% { transform: rotate(360deg); transform-origin: 50% 50%; }
+}
+
+@keyframes spinLight {
+  0% { transform: rotate(0deg); transform-origin: 50% 50%; }
+  100% { transform: rotate(360deg); transform-origin: 50% 50%; }
+}
+
+.loader-text {
+  margin-top: 24px;
+  color: #00ffff;
+  font-family: "Orbitron", Arial, sans-serif;
+  font-weight: bold;
+  font-size: 28px;
+  text-shadow:
+    0 0 8px #00ffff,
+    0 0 16px #00eaff,
+    0 0 24px #00c8ff,
+    0 0 32px #00eaff;
+  animation: neonPulseText 1.5s alternate infinite;
+  z-index: 10;
+}
+
+@keyframes neonPulseText {
+  0% { text-shadow: 0 0 8px #00ffff, 0 0 16px #00eaff, 0 0 24px #00c8ff, 0 0 32px #00eaff; }
+  100% { text-shadow: 0 0 12px #00ffff, 0 0 24px #00eaff, 0 0 36px #00c8ff, 0 0 48px #00eaff; }
 }

@@ -23,6 +23,7 @@ args = parser.parse_args()
 API_URL = args.api
 SEND_INTERVAL = max(0.5, float(args.interval))
 
+# --- Lấy thông tin tĩnh ---
 def get_static_info():
     hostname = platform.node()
     cpu_count = psutil.cpu_count(logical=True)
@@ -59,6 +60,7 @@ def get_disk_info():
         except PermissionError:
             continue
     return disks, total_used / (1024**3), total_size / (1024**3)
+
 
 def get_dynamic_info():
     ram = psutil.virtual_memory()

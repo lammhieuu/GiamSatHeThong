@@ -1,4 +1,4 @@
-//MachineTable.js
+// MachineTable.js
 import React, { useState } from "react";
 import "./Machine.css";
 
@@ -60,7 +60,20 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
   const defaultPlatforms = ["VNPT Cloud", "Viettel Cloud", "TTCNTT LC"];
 
   if (!clients || Object.keys(clients).length === 0) {
-    return <p className="no-clients">No clients connected</p>;
+    return (
+      <div className="loader-fullscreen">
+        <div className="loader-container">
+          <div className="neon-spinner">
+            <svg viewBox="0 0 150 150">
+              <circle className="spinner-bg" cx="75" cy="75" r="70" />
+              <circle className="spinner" cx="75" cy="75" r="70" />
+              <circle className="spinner-light" cx="75" cy="75" r="70" />
+            </svg>
+          </div>
+          <div className="loader-text">Loading...</div>
+        </div>
+      </div>
+    );
   }
 
   return (

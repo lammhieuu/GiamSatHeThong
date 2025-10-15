@@ -25,7 +25,7 @@ export default function MachineList() {
     try {
       const clientData = { ...clients[id] };
       if (!clientData) return;
-      delete clientData._id; // Loại bỏ _id hoàn toàn
+      delete clientData._id; 
       const res = await fetch(`${API_BASE}/save/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +54,7 @@ export default function MachineList() {
   const handleUpdate = async (machine_id, newData) => {
     try {
       const payload = { ...newData };
-      delete payload._id; // Loại bỏ _id hoàn toàn
+      delete payload._id; 
       const res = await fetch(`${API_BASE}/update/${machine_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
