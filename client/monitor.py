@@ -134,10 +134,10 @@ def main():
 
             if exists:
                 data_to_send = dynamic_data
-                print("Machine exists, sending only dynamic data")
+                # print("Machine exists, sending only dynamic data")
             else:
                 data_to_send = {**static_info, **dynamic_data}
-                print("Machine not found, sending full data")
+                # print("Machine not found, sending full data")
 
             try:
                 sio.emit("system_update", data_to_send, namespace="/")

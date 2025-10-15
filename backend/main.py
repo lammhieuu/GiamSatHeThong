@@ -10,6 +10,7 @@ from datetime import datetime
 # --- Cấu hình CORS ---
 origins = [
     "https://monitor.lcit.vn:4001",
+
     "https://monitor.lcit.vn:8000",
     "https://monitor.lcit.vn",
     "http://localhost:4001",
@@ -30,7 +31,7 @@ app.add_middleware(
 )
 socket_app = socketio.ASGIApp(sio, app)
 
-connection_string = "mongodb+srv://lammhieuu_db_user:scm123456@server.2bf1k73.mongodb.net/?retryWrites=true&w=majority&appName=Server"
+connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]

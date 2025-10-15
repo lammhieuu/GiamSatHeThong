@@ -1,8 +1,7 @@
-// Login.js
 import React, { useState } from "react";
 import "./Machine.css"; 
 
-const API_BASE = "https://monitor.lcit.vn:4001";
+const API_BASE = "http://localhost:4001";
 
 export default function Login({ onLogin }) {
   const [tk, setTk] = useState("");
@@ -17,14 +16,17 @@ export default function Login({ onLogin }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tk, mk }),
       });
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text);
       }
+
       const data = await res.json();
       setError("");
-      onLogin(data.tk); // thông báo đăng nhập thành công cho App.js
+      onLogin(data.tk);
     } catch (err) {
+      console.error("Login error:", err);
       setError("Sai tài khoản hoặc mật khẩu");
     }
   };
