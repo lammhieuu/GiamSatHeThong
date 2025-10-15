@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import "./Machine.css";
 import { MachineTable } from "./MachineTable";
 
-const API_BASE = "http://localhost:4001";
+const API_BASE = "https://monitor.lcit.vn:4001";
 const socket = io(API_BASE, { transports: ["websocket"] });
 
 export default function MachineList() {
