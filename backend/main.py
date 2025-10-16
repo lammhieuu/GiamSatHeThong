@@ -47,7 +47,7 @@ def make_serializable(clients):
 @sio.event
 async def connect(sid, environ, auth=None):
     all_clients = {doc["machine_id"]: doc for doc in collection.find()}
-    await sio.emit("update", make_serializable(all_clients))
+    await sio.emit("update", make_serializable(all_clients), to=sid)
 
 @sio.event
 async def disconnect(sid):
@@ -76,8 +76,8 @@ async def system_update(sid, data):
 # --- API ---
 @app.get("/clients")
 async def get_clients():
-    all_clients = {doc["machine_id"]: doc for doc in collection.find()}
-    return make_serializable(all_clients)
+    all_clients = {doc["machine_id"]: doc for doc in collection.find({}, {"_id": 0})}
+    return all_clients
 
 @app.get("/clients/{client_id}")
 async def get_client(client_id: str):
@@ -188,7 +188,7 @@ async def _local_reporter_task(interval: float = 5.0):
         except Exception as e:
             print("Reporter error:", e)
         await asyncio.sleep(interval)
-###MAin
+
 if __name__ == "__main__":
     import uvicorn
     loop = asyncio.get_event_loop()
