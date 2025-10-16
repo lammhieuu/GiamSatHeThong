@@ -133,11 +133,11 @@ async def login(payload: dict = Body(...)):
     mk = payload.get("mk")
     if not tk or not mk:
         raise HTTPException(400, "Missing credentials")
+    # Truy vấn MongoDB
+    account_collection = app_db["TAI_KHOAN"]
+    account = account_collection.find_one({"tk": tk, "mk": mk})
 
-    DEFAULT_USERNAME = "admin"
-    DEFAULT_PASSWORD = "123456"
-
-    if tk != DEFAULT_USERNAME or mk != DEFAULT_PASSWORD:
+    if not account:
         raise HTTPException(401, "Invalid username or password")
 
     return {"status": "ok", "tk": tk}
