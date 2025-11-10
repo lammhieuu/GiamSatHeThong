@@ -18,7 +18,7 @@ origins = [
     "http://192.168.251.32:3002",
     "http://localhost:3000"
 ]
-#
+
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=origins)
 app = FastAPI()
 app.add_middleware(
@@ -62,12 +62,18 @@ async def system_update(sid, data):
 
     db_doc = collection.find_one({"machine_id": machine_id})
     if db_doc:
-        dynamic_fields = ["cpu_percent", "ram_used", "ram_total", "ram_percent", "disk_used", "disks", "last_update"]
+        # Thêm listening_ports vào danh sách các trường dynamic
+        dynamic_fields = ["cpu_percent", "ram_used", "ram_total", "ram_percent", 
+                         "disk_used", "disks", "ip", "ip_addresses", "listening_ports", "last_update"]
         update_data = {field: data[field] for field in dynamic_fields if field in data}
         collection.update_one({"machine_id": machine_id}, {"$set": update_data})
     else:
         data.setdefault("platform", "-")
         data.setdefault("last_update", datetime.now().isoformat())
+        if "ip_addresses" not in data:
+            data["ip_addresses"] = []
+        if "listening_ports" not in data:
+            data["listening_ports"] = []
         collection.insert_one(data)
 
     all_clients = {doc["machine_id"]: doc for doc in collection.find()}
@@ -87,6 +93,14 @@ async def get_client(client_id: str):
     if "_id" in doc:
         doc["_id"] = str(doc["_id"])
     return doc
+
+@app.get("/clients/{client_id}/ports")
+async def get_client_ports(client_id: str):
+    """API endpoint để lấy thông tin các cổng đang lắng nghe của một máy chủ"""
+    doc = collection.find_one({"machine_id": client_id}, {"listening_ports": 1, "_id": 0})
+    if not doc:
+        raise HTTPException(404, "client not found")
+    return {"listening_ports": doc.get("listening_ports", [])}
 
 @app.delete("/clients/{client_id}")
 async def delete_client(client_id: str):
@@ -133,7 +147,6 @@ async def login(payload: dict = Body(...)):
     mk = payload.get("mk")
     if not tk or not mk:
         raise HTTPException(400, "Missing credentials")
-    # Truy vấn MongoDB
     account_collection = app_db["TAI_KHOAN"]
     account = account_collection.find_one({"tk": tk, "mk": mk})
 

@@ -24,20 +24,91 @@ args = parser.parse_args()
 API_URL = args.api
 SEND_INTERVAL = max(0.5, float(args.interval))
 
+# --- Lấy tất cả IP addresses ---
+def get_all_ip_addresses():
+    ip_list = []
+    try:
+        for interface, addrs in psutil.net_if_addrs().items():
+            for addr in addrs:
+                if addr.family == socket.AF_INET:
+                    ip = addr.address
+                    if ip != "127.0.0.1":
+                        ip_list.append({
+                            "interface": interface,
+                            "ip": ip
+                        })
+        
+        if not ip_list:
+            ip_list.append({
+                "interface": "lo",
+                "ip": "127.0.0.1"
+            })
+    except Exception as e:
+        print(f"Error getting IP addresses: {e}")
+        ip_list.append({
+            "interface": "unknown",
+            "ip": "127.0.0.1"
+        })
+    
+    return ip_list
+
+# --- Lấy thông tin các cổng đang lắng nghe ---
+def get_listening_ports():
+    ports_info = []
+    try:
+        connections = psutil.net_connections(kind='inet')
+        for conn in connections:
+            # Chỉ lấy các cổng đang LISTEN
+            if conn.status == 'LISTEN':
+                try:
+                    # Lấy thông tin process
+                    process_name = "-"
+                    if conn.pid:
+                        try:
+                            proc = psutil.Process(conn.pid)
+                            process_name = proc.name()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            process_name = "Unknown"
+                    
+                    # Xác định protocol
+                    protocol = "TCP" if conn.type == socket.SOCK_STREAM else "UDP"
+                    
+                    # Lấy địa chỉ và port
+                    address = conn.laddr.ip if conn.laddr else "-"
+                    port = conn.laddr.port if conn.laddr else 0
+                    
+                    ports_info.append({
+                        "protocol": protocol,
+                        "address": address,
+                        "port": port,
+                        "pid": conn.pid or 0,
+                        "process": process_name
+                    })
+                except Exception as e:
+                    continue
+        
+        # Sắp xếp theo port
+        ports_info.sort(key=lambda x: x['port'])
+        
+    except Exception as e:
+        print(f"Error getting listening ports: {e}")
+    
+    return ports_info
+
 # --- Lấy thông tin tĩnh ---
 def get_static_info():
     hostname = platform.node()
     cpu_count = psutil.cpu_count(logical=True)
-    try:
-        ip_address = socket.gethostbyname(socket.gethostname())
-    except:
-        ip_address = "127.0.0.1"
+    ip_addresses = get_all_ip_addresses()
+    primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
     disks, total_used, total_size = get_disk_info()
+    
     return {
         "machine_id": hex(uuid.getnode())[2:],
         "hostname": hostname,
         "os": platform.system() + " " + platform.release(),
-        "ip": ip_address,
+        "ip": primary_ip,
+        "ip_addresses": ip_addresses,
         "cpu_count": cpu_count,
         "disk_total": total_size,
         "disks": disks,
@@ -67,6 +138,12 @@ def get_dynamic_info():
     ram = psutil.virtual_memory()
     cpu_percent = psutil.cpu_percent(interval=None)
     disks, total_used, _ = get_disk_info()
+    ip_addresses = get_all_ip_addresses()
+    primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
+    
+    # Lấy thông tin các cổng đang lắng nghe
+    listening_ports = get_listening_ports()
+    
     return {
         "cpu_percent": cpu_percent,
         "ram_used": ram.used / (1024**3),
@@ -74,6 +151,9 @@ def get_dynamic_info():
         "ram_percent": ram.percent,
         "disk_used": total_used,
         "disks": disks,
+        "ip": primary_ip,
+        "ip_addresses": ip_addresses,
+        "listening_ports": listening_ports,
         "last_update": datetime.now().isoformat()
     }
 
@@ -122,6 +202,7 @@ def main():
 
     _connect_with_backoff(API_URL)
     print("Starting system monitor... (Ctrl+C to stop)")
+    print(f"Machine ID: {static_info['machine_id']}")
 
     try:
         while running:
@@ -135,10 +216,8 @@ def main():
 
             if exists:
                 data_to_send = dynamic_data
-                # print("Machine exists, sending only dynamic data")
             else:
                 data_to_send = {**static_info, **dynamic_data}
-                # print("Machine not found, sending full data")
 
             try:
                 sio.emit("system_update", data_to_send, namespace="/")
