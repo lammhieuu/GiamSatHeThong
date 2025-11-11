@@ -27,14 +27,25 @@ SEND_INTERVAL = max(0.5, float(args.interval))
 # --- Lấy tất cả IP addresses ---
 def get_all_ip_addresses():
     ip_list = []
+    interface_count = {}  # Đếm số lần xuất hiện của mỗi interface
+    
     try:
         for interface, addrs in psutil.net_if_addrs().items():
             for addr in addrs:
                 if addr.family == socket.AF_INET:
                     ip = addr.address
                     if ip != "127.0.0.1":
+                        # Đếm số lần interface xuất hiện
+                        interface_count[interface] = interface_count.get(interface, 0) + 1
+                        
+                        # Nếu interface xuất hiện lần thứ 2 trở đi, thêm suffix
+                        if interface_count[interface] > 1:
+                            display_name = f"{interface} #{interface_count[interface]}"
+                        else:
+                            display_name = interface
+                        
                         ip_list.append({
-                            "interface": interface,
+                            "interface": display_name,
                             "ip": ip
                         })
         

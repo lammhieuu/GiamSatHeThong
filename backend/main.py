@@ -31,6 +31,7 @@ app.add_middleware(
 socket_app = socketio.ASGIApp(sio, app)
 
 connection_string = "mongodb://root:UddlLaoCaiLcit%40841889@192.168.251.32:27017/?authSource=admin"
+# connection_string = "mongodb+srv://lammhieuu_db_user:scm123456@server.2bf1k73.mongodb.net/?appName=Server"
 mongo_client = MongoClient(connection_string)
 app_db = mongo_client["app_database"]
 collection = app_db["MAY_CHU"]
@@ -62,12 +63,13 @@ async def system_update(sid, data):
 
     db_doc = collection.find_one({"machine_id": machine_id})
     if db_doc:
-        # Thêm listening_ports vào danh sách các trường dynamic
+        # ✅ LOẠI BỎ "ip" và "ip_addresses" khỏi danh sách realtime
         dynamic_fields = ["cpu_percent", "ram_used", "ram_total", "ram_percent", 
-                         "disk_used", "disks", "ip", "ip_addresses", "listening_ports", "last_update"]
+                         "disk_used", "disks", "listening_ports", "last_update"]
         update_data = {field: data[field] for field in dynamic_fields if field in data}
         collection.update_one({"machine_id": machine_id}, {"$set": update_data})
     else:
+        # Khi thêm máy mới lần đầu, vẫn lưu đầy đủ thông tin
         data.setdefault("platform", "-")
         data.setdefault("last_update", datetime.now().isoformat())
         if "ip_addresses" not in data:
