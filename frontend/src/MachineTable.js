@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import "./Machine.css";
 
-const API_BASE = "http://localhost:4001";
+const API_BASE = "https://monitor.lcit.vn:4001";
 
 export function CircularProgress({ percent, size = 50, strokeWidth = 6 }) {
   const radius = (size - strokeWidth) / 2;
