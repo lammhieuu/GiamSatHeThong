@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./Machine.css"; 
 
-const API_BASE = "http://localhost:4001";
+const API_BASE = "https://monitor.lcit.vn:4001";
 
 export default function Login({ onLogin }) {
   const [tk, setTk] = useState("");
