@@ -367,7 +367,46 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
                     <IPAddressList ipAddresses={info.ip_addresses} />
                   )}
                 </td>
-                <td>{info.platform || "-"}</td>
+                <td>
+                  {isEditing ? (
+                    <>
+                      <select
+                        value={editData.platform === "Khác" ? "Khác" : (editData.platform || "")}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setEditData({ 
+                            ...editData, 
+                            platform: value,
+                            customPlatform: value === "Khác" ? (editData.customPlatform || "") : ""
+                          });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ width: "100%", marginBottom: editData.platform === "Khác" ? "8px" : "0" }}
+                      >
+                        <option value="">-- Chọn nền tảng --</option>
+                        <option value="VNPT Cloud">VNPT Cloud</option>
+                        <option value="Viettel Cloud">Viettel Cloud</option>
+                        <option value="TTCNTT LC">TTCNTT LC</option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                      {editData.platform === "Khác" && (
+                        <input
+                          type="text"
+                          placeholder="Nhập nền tảng khác..."
+                          value={editData.customPlatform || ""}
+                          onChange={(e) =>
+                            setEditData({ ...editData, customPlatform: e.target.value })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.key === "Enter" && onUpdate(id, editData)}
+                          style={{ width: "100%", marginTop: "4px" }}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    info.platform || "-"
+                  )}
+                </td>
                 <td>{info.cpu_count || 0}</td>
                 <td>{Number(info.ram_total || 0).toFixed(1)} GB</td>
                 <td>
@@ -406,7 +445,12 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
                       <button
                         className="btn btn-save"
                         onClick={() => {
-                          onUpdate(id, editData);
+                          const dataToSave = { ...editData };
+                          if (dataToSave.platform === "Khác" && dataToSave.customPlatform) {
+                            dataToSave.platform = dataToSave.customPlatform;
+                          }
+                          delete dataToSave.customPlatform;
+                          onUpdate(id, dataToSave);
                           setEditId(null);
                         }}
                       >
@@ -422,10 +466,13 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
                         className="btn btn-edit"
                         onClick={() => {
                           setEditId(id);
+                          const platformOptions = ["VNPT Cloud", "Viettel Cloud", "TTCNTT LC"];
+                          const isCustomPlatform = info.platform && !platformOptions.includes(info.platform);
                           setEditData({
                             hostname: info.hostname,
                             ip: info.ip,
-                            platform: info.platform || "",
+                            platform: isCustomPlatform ? "Khác" : (info.platform || ""),
+                            customPlatform: isCustomPlatform ? info.platform : "",
                           });
                         }}
                       >
