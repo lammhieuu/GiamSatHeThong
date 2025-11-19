@@ -243,11 +243,28 @@ export function MachineTable({ clients, onDelete, onSave, onUpdate }) {
 
   const filteredClients = useMemo(() => {
     let result = Object.entries(clients);
+    const predefinedPlatforms = ["VNPT Cloud", "Viettel Cloud", "TTCNTT LC"];
+    
     for (const [key, value] of Object.entries(filters)) {
-      if (!value) continue;
+      if (!value || value.trim() === "") continue;
+      
       result = result.filter(([_, info]) => {
-        const val = (info[key] || "").toString().toLowerCase();
-        return val.includes(value.toLowerCase());
+        const infoValue = info[key];
+        
+        // Xử lý đặc biệt cho filter platform = "Khác"
+        if (key === "platform" && value === "Khác") {
+          const platform = infoValue?.toString().trim() || "";
+          // Hiển thị các nền tảng KHÔNG PHẢI là 3 nền tảng có sẵn
+          return platform !== "" && 
+                 platform !== "-" && 
+                 !predefinedPlatforms.includes(platform);
+        }
+        
+        // Filter bình thường cho các trường khác
+        if (infoValue === null || infoValue === undefined) return false;
+        const val = infoValue.toString().toLowerCase().trim();
+        const filterVal = value.toString().toLowerCase().trim();
+        return val.includes(filterVal);
       });
     }
     return result;
