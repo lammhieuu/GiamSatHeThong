@@ -9,6 +9,8 @@ import socket
 import uuid
 from datetime import datetime
 import requests
+import tkinter as tk
+from tkinter import messagebox, simpledialog
 
 sio = socketio.Client(reconnection=True)
 
@@ -170,11 +172,11 @@ def get_dynamic_info():
 
 @sio.event
 def connect():
-    print("Connected to Server!", API_URL)
+    pass
 
 @sio.event
 def disconnect():
-    print("Disconnected from Server!")
+    pass
 
 @sio.on("stop_monitor")
 def stop_monitor(data):
@@ -182,7 +184,6 @@ def stop_monitor(data):
     if machine_id == static_info["machine_id"]:
         global running
         running = False
-        print("Received stop_monitor, exiting...")
         try:
             sio.disconnect()
         except:
@@ -200,10 +201,243 @@ def _connect_with_backoff(url):
             backoff = min(30, backoff * 1.5)
 
 def check_machine_exists(machine_id):
+    """Kiểm tra xem máy đã tồn tại trong database chưa"""
     try:
         res = requests.get(f"{API_URL}/clients/{machine_id}", timeout=2)
-        return res.status_code == 200
+        if res.status_code == 200:
+            data = res.json()
+            return True, data
+        return False, None
     except:
+        return False, None
+
+def show_platform_input_dialog(hostname):
+    """Hiển thị popup đẹp để nhập thông tin nền tảng"""
+    result = [None]  # Dùng list để lưu kết quả
+    cancelled = [False]  # Flag để biết người dùng có ấn Hủy không
+    
+    def on_selection_change(event):
+        selected = combo.get()
+        if selected == "Khác":
+            entry.config(state='normal')
+            entry.focus()
+        else:
+            entry.delete(0, tk.END)
+            entry.config(state='disabled')
+    
+    def on_save():
+        selected = combo.get()
+        if selected == "Khác":
+            value = entry.get().strip()
+            if value:
+                result[0] = value
+                dialog.destroy()
+            else:
+                error_label.config(text="⚠ Vui lòng nhập nền tảng!")
+        elif selected:
+            result[0] = selected
+            dialog.destroy()
+        else:
+            error_label.config(text="⚠ Vui lòng chọn nền tảng!")
+    
+    def on_cancel():
+        """Hủy và dừng chương trình"""
+        cancelled[0] = True
+        result[0] = None
+        dialog.destroy()
+    
+    def on_close():
+        """Xử lý khi đóng cửa sổ bằng nút X"""
+        on_cancel()
+    
+    # Tạo cửa sổ dialog
+    dialog = tk.Tk()
+    dialog.title("Cấu hình hệ thống")
+    dialog.geometry("450x380")
+    dialog.resizable(False, False)
+    dialog.configure(bg="#f8f9fa")
+    dialog.protocol("WM_DELETE_WINDOW", on_close)
+    
+    # Tăng DPI awareness để hiển thị sắc nét hơn
+    try:
+        from ctypes import windll
+        windll.shcore.SetProcessDpiAwareness(1)
+    except:
+        pass
+    
+    # Đưa cửa sổ lên phía trước và giữa màn hình
+    dialog.attributes('-topmost', True)
+    dialog.lift()
+    dialog.focus_force()
+    
+    # Căn giữa màn hình
+    dialog.update_idletasks()
+    x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
+    y = (dialog.winfo_screenheight() // 2) - (380 // 2)
+    dialog.geometry(f"450x380+{x}+{y}")
+    
+    # Frame chính với padding
+    main_frame = tk.Frame(dialog, bg="#f8f9fa", padx=35, pady=30)
+    main_frame.pack(fill=tk.BOTH, expand=True)
+    
+    # Tiêu đề
+    title_label = tk.Label(
+        main_frame,
+        text="📋 Nhập Thông Tin Nền Tảng",
+        font=("Segoe UI", 16, "bold"),
+        bg="#f8f9fa",
+        fg="#1a1a1a"
+    )
+    title_label.pack(pady=(0, 5))
+    
+    # Thông tin máy
+    info_label = tk.Label(
+        main_frame,
+        text=f"Máy: {hostname}",
+        font=("Segoe UI", 10),
+        bg="#f8f9fa",
+        fg="#6c757d"
+    )
+    info_label.pack(pady=(0, 20))
+    
+    # Label cho selectbox
+    label = tk.Label(
+        main_frame,
+        text="Chọn nền tảng:",
+        font=("Segoe UI", 10, "bold"),
+        bg="#f8f9fa",
+        fg="#1a1a1a"
+    )
+    label.pack(anchor=tk.W, pady=(0, 8))
+    
+    # Import ttk cho Combobox
+    from tkinter import ttk
+    
+    # Tạo style cho combobox
+    style = ttk.Style()
+    style.theme_use('clam')
+    style.configure(
+        'Custom.TCombobox',
+        fieldbackground='white',
+        background='white',
+        bordercolor='#ced4da',
+        arrowcolor='#495057',
+        relief='solid',
+        borderwidth=1
+    )
+    
+    # Selectbox (Combobox)
+    platforms = ["Viettel Cloud", "VNTP Cloud", "TTCNTT LC", "Khác"]
+    combo = ttk.Combobox(
+        main_frame,
+        values=platforms,
+        font=("Segoe UI", 10),
+        state='readonly',
+        style='Custom.TCombobox',
+        height=10
+    )
+    combo.pack(fill=tk.X, ipady=6)
+    combo.set("Viettel Cloud")  # Giá trị mặc định
+    combo.bind('<<ComboboxSelected>>', on_selection_change)
+    
+    # Entry cho trường hợp chọn "Khác" (ban đầu ẩn/disabled)
+    entry = tk.Entry(
+        main_frame,
+        font=("Segoe UI", 10),
+        relief=tk.SOLID,
+        borderwidth=1,
+        state='disabled',
+        disabledbackground='#e9ecef',
+        disabledforeground='#6c757d',
+        highlightthickness=0,
+        bd=1
+    )
+    entry.pack(fill=tk.X, ipady=6, pady=(10, 0))
+    
+    # Label lỗi (ẩn mặc định)
+    error_label = tk.Label(
+        main_frame,
+        text="",
+        font=("Segoe UI", 9),
+        bg="#f8f9fa",
+        fg="#dc3545"
+    )
+    error_label.pack(pady=(8, 10))
+    
+    # Frame chứa các nút
+    button_frame = tk.Frame(main_frame, bg="#f8f9fa")
+    button_frame.pack(pady=(15, 0))
+    
+    # Nút Lưu
+    save_btn = tk.Button(
+        button_frame,
+        text="💾 Lưu",
+        font=("Segoe UI", 10, "bold"),
+        bg="#28a745",
+        fg="white",
+        activebackground="#218838",
+        activeforeground="white",
+        relief=tk.FLAT,
+        cursor="hand2",
+        padx=30,
+        pady=10,
+        command=on_save,
+        borderwidth=0,
+        highlightthickness=0
+    )
+    save_btn.pack(side=tk.LEFT, padx=5)
+    
+    # Nút Hủy
+    cancel_btn = tk.Button(
+        button_frame,
+        text="✖ Hủy (Thoát)",
+        font=("Segoe UI", 10, "bold"),
+        bg="#dc3545",
+        fg="white",
+        activebackground="#c82333",
+        activeforeground="white",
+        relief=tk.FLAT,
+        cursor="hand2",
+        padx=25,
+        pady=10,
+        command=on_cancel,
+        borderwidth=0,
+        highlightthickness=0
+    )
+    cancel_btn.pack(side=tk.LEFT, padx=5)
+    
+    # Bind Enter key
+    dialog.bind('<Return>', lambda e: on_save())
+    dialog.bind('<Escape>', lambda e: on_cancel())
+    
+    # Chạy dialog
+    dialog.mainloop()
+    
+    # Kiểm tra xem người dùng có ấn Hủy không
+    if cancelled[0]:
+        print("\n❌ Người dùng đã hủy. Dừng chương trình...")
+        import sys
+        sys.exit(0)
+    
+    return result[0] if result[0] else "-"
+
+def update_platform_to_server(machine_id, platform_value):
+    """Cập nhật thông tin nền tảng lên server"""
+    try:
+        payload = {"platform": platform_value}
+        res = requests.put(
+            f"{API_URL}/update/{machine_id}",
+            json=payload,
+            timeout=5
+        )
+        if res.status_code == 200:
+            print(f"✓ Đã cập nhật nền tảng: {platform_value}")
+            return True
+        else:
+            print(f"✗ Lỗi cập nhật nền tảng: {res.status_code}")
+            return False
+    except Exception as e:
+        print(f"✗ Lỗi kết nối khi cập nhật nền tảng: {e}")
         return False
 
 def main():
@@ -211,9 +445,40 @@ def main():
     static_info = get_static_info()
     running = True
 
+    print(f"Machine ID: {static_info['machine_id']}")
+    print(f"Hostname: {static_info['hostname']}")
+    
+    # Kiểm tra xem máy đã tồn tại và có nền tảng chưa
+    exists, machine_data = check_machine_exists(static_info["machine_id"])
+    
+    need_platform_input = False
+    
+    if not exists:
+        # Máy mới → cần nhập nền tảng
+        print("⚠ Máy mới, yêu cầu nhập thông tin nền tảng...")
+        need_platform_input = True
+    elif machine_data:
+        current_platform = machine_data.get("platform", "-")
+        print(f"Nền tảng hiện tại: {current_platform}")
+        
+        # Nếu nền tảng là "-" hoặc rỗng → cần nhập nền tảng
+        if current_platform == "-" or not current_platform:
+            print("⚠ Máy chưa có thông tin nền tảng, yêu cầu nhập...")
+            need_platform_input = True
+        else:
+            static_info["platform"] = current_platform
+    
+    # Hiển thị pop-up nếu cần
+    if need_platform_input:
+        platform_value = show_platform_input_dialog(static_info['hostname'])
+        static_info["platform"] = platform_value
+        
+        # Cập nhật lên server nếu máy đã tồn tại
+        if exists:
+            update_platform_to_server(static_info["machine_id"], platform_value)
+
     _connect_with_backoff(API_URL)
     print("Starting system monitor... (Ctrl+C to stop)")
-    print(f"Machine ID: {static_info['machine_id']}")
 
     try:
         while running:
@@ -223,7 +488,7 @@ def main():
             dynamic_data = get_dynamic_info()
             dynamic_data["machine_id"] = static_info["machine_id"]
 
-            exists = check_machine_exists(static_info["machine_id"])
+            exists, _ = check_machine_exists(static_info["machine_id"])
 
             if exists:
                 data_to_send = dynamic_data
