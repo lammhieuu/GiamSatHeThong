@@ -108,9 +108,8 @@ def get_listening_ports():
     
     return ports_info
 
-# --- Lấy thông tin tĩnh ---
+# --- Lấy thông tin tĩnh (KHÔNG CÒN HOSTNAME) ---
 def get_static_info():
-    hostname = platform.node()
     cpu_count = psutil.cpu_count(logical=True)
     ip_addresses = get_all_ip_addresses()
     primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
@@ -118,14 +117,14 @@ def get_static_info():
     
     return {
         "machine_id": hex(uuid.getnode())[2:],
-        "hostname": hostname,
         "os": platform.system() + " " + platform.release(),
         "ip": primary_ip,
         "ip_addresses": ip_addresses,
         "cpu_count": cpu_count,
         "disk_total": total_size,
         "disks": disks,
-        "platform": "-"
+        "platform": "-",
+        "hostname": "-"  # Sẽ được cập nhật từ UI
     }
 
 def get_disk_info():
@@ -211,39 +210,48 @@ def check_machine_exists(machine_id):
     except:
         return False, None
 
-def show_platform_input_dialog(hostname):
-    """Hiển thị popup đẹp để nhập thông tin nền tảng"""
-    result = [None]  # Dùng list để lưu kết quả
-    cancelled = [False]  # Flag để biết người dùng có ấn Hủy không
+def show_input_dialog(current_hostname_system):
+    """Hiển thị popup để nhập thông tin nền tảng và tên máy chủ"""
+    result = {"platform": None, "hostname": None}
+    cancelled = [False]
     
     def on_selection_change(event):
-        selected = combo.get()
+        selected = platform_combo.get()
         if selected == "Khác":
-            entry.config(state='normal')
-            entry.focus()
+            platform_entry.config(state='normal')
+            platform_entry.focus()
         else:
-            entry.delete(0, tk.END)
-            entry.config(state='disabled')
+            platform_entry.delete(0, tk.END)
+            platform_entry.config(state='disabled')
     
     def on_save():
-        selected = combo.get()
-        if selected == "Khác":
-            value = entry.get().strip()
-            if value:
-                result[0] = value
-                dialog.destroy()
-            else:
-                error_label.config(text="⚠ Vui lòng nhập nền tảng!")
-        elif selected:
-            result[0] = selected
-            dialog.destroy()
+        # Lấy platform
+        selected_platform = platform_combo.get()
+        if selected_platform == "Khác":
+            platform_value = platform_entry.get().strip()
+            if not platform_value:
+                error_label.config(text="Vui lòng nhập nền tảng!")
+                return
+        elif selected_platform:
+            platform_value = selected_platform
         else:
-            error_label.config(text="⚠ Vui lòng chọn nền tảng!")
+            error_label.config(text="Vui lòng chọn nền tảng!")
+            return
+        
+        # Lấy hostname
+        hostname_value = hostname_entry.get().strip()
+        if not hostname_value:
+            error_label.config(text="Vui lòng nhập tên máy chủ!")
+            return
+        
+        # Lưu kết quả
+        result["platform"] = platform_value
+        result["hostname"] = hostname_value
+        dialog.destroy()
     
     def on_cancel():
         """Hủy và dừng chương trình"""
         cancelled[0] = True
-        result[0] = None
         dialog.destroy()
     
     def on_close():
@@ -253,12 +261,12 @@ def show_platform_input_dialog(hostname):
     # Tạo cửa sổ dialog
     dialog = tk.Tk()
     dialog.title("Cấu hình hệ thống")
-    dialog.geometry("450x380")
+    dialog.geometry("450x500")
     dialog.resizable(False, False)
     dialog.configure(bg="#f8f9fa")
     dialog.protocol("WM_DELETE_WINDOW", on_close)
     
-    # Tăng DPI awareness để hiển thị sắc nét hơn
+    # Tăng DPI awareness
     try:
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
@@ -273,8 +281,8 @@ def show_platform_input_dialog(hostname):
     # Căn giữa màn hình
     dialog.update_idletasks()
     x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-    y = (dialog.winfo_screenheight() // 2) - (380 // 2)
-    dialog.geometry(f"450x380+{x}+{y}")
+    y = (dialog.winfo_screenheight() // 2) - (450 // 2)
+    dialog.geometry(f"450x450+{x}+{y}")
     
     # Frame chính với padding
     main_frame = tk.Frame(dialog, bg="#f8f9fa", padx=35, pady=30)
@@ -283,32 +291,32 @@ def show_platform_input_dialog(hostname):
     # Tiêu đề
     title_label = tk.Label(
         main_frame,
-        text="📋 Nhập Thông Tin Nền Tảng",
+        text="📋 Nhập Thông Tin Hệ Thống",
         font=("Segoe UI", 16, "bold"),
         bg="#f8f9fa",
         fg="#1a1a1a"
     )
     title_label.pack(pady=(0, 5))
     
-    # Thông tin máy
-    info_label = tk.Label(
-        main_frame,
-        text=f"Máy: {hostname}",
-        font=("Segoe UI", 10),
-        bg="#f8f9fa",
-        fg="#6c757d"
-    )
-    info_label.pack(pady=(0, 20))
+    # # Thông tin machine ID
+    # info_label = tk.Label(
+    #     main_frame,
+    #     text=f"Machine ID: {static_info['machine_id']}\nHệ điều hành: {current_hostname_system}",
+    #     font=("Segoe UI", 9),
+    #     bg="#f8f9fa",
+    #     fg="#6c757d",
+    #     justify=tk.LEFT
+    # )
+    # info_label.pack(pady=(0, 20))
     
-    # Label cho selectbox
-    label = tk.Label(
+    platform_label = tk.Label(
         main_frame,
         text="Chọn nền tảng:",
         font=("Segoe UI", 10, "bold"),
         bg="#f8f9fa",
         fg="#1a1a1a"
     )
-    label.pack(anchor=tk.W, pady=(0, 8))
+    platform_label.pack(anchor=tk.W, pady=(0, 8))
     
     # Import ttk cho Combobox
     from tkinter import ttk
@@ -326,9 +334,9 @@ def show_platform_input_dialog(hostname):
         borderwidth=1
     )
     
-    # Selectbox (Combobox)
+    # Selectbox Nền tảng
     platforms = ["Viettel Cloud", "VNTP Cloud", "TTCNTT LC", "Khác"]
-    combo = ttk.Combobox(
+    platform_combo = ttk.Combobox(
         main_frame,
         values=platforms,
         font=("Segoe UI", 10),
@@ -336,12 +344,12 @@ def show_platform_input_dialog(hostname):
         style='Custom.TCombobox',
         height=10
     )
-    combo.pack(fill=tk.X, ipady=6)
-    combo.set("Viettel Cloud")  # Giá trị mặc định
-    combo.bind('<<ComboboxSelected>>', on_selection_change)
+    platform_combo.pack(fill=tk.X, ipady=6)
+    platform_combo.set("Viettel Cloud")
+    platform_combo.bind('<<ComboboxSelected>>', on_selection_change)
     
-    # Entry cho trường hợp chọn "Khác" (ban đầu ẩn/disabled)
-    entry = tk.Entry(
+    # Entry cho trường hợp chọn "Khác"
+    platform_entry = tk.Entry(
         main_frame,
         font=("Segoe UI", 10),
         relief=tk.SOLID,
@@ -352,9 +360,30 @@ def show_platform_input_dialog(hostname):
         highlightthickness=0,
         bd=1
     )
-    entry.pack(fill=tk.X, ipady=6, pady=(10, 0))
+    platform_entry.pack(fill=tk.X, ipady=6, pady=(10, 0))
     
-    # Label lỗi (ẩn mặc định)
+    hostname_label = tk.Label(
+        main_frame,
+        text="Nhập tên máy chủ:",
+        font=("Segoe UI", 10, "bold"),
+        bg="#f8f9fa",
+        fg="#1a1a1a"
+    )
+    hostname_label.pack(anchor=tk.W, pady=(20, 8))
+    
+    # Entry cho hostname
+    hostname_entry = tk.Entry(
+        main_frame,
+        font=("Segoe UI", 10),
+        relief=tk.SOLID,
+        borderwidth=1,
+        highlightthickness=0,
+        bd=1
+    )
+    hostname_entry.pack(fill=tk.X, ipady=6)
+    hostname_entry.insert(0, current_hostname_system)  # Gợi ý tên hệ thống hiện tại
+    
+    # Label lỗi
     error_label = tk.Label(
         main_frame,
         text="",
@@ -390,7 +419,7 @@ def show_platform_input_dialog(hostname):
     # Nút Hủy
     cancel_btn = tk.Button(
         button_frame,
-        text="✖ Hủy (Thoát)",
+        text="✖ Hủy",
         font=("Segoe UI", 10, "bold"),
         bg="#dc3545",
         fg="white",
@@ -415,29 +444,32 @@ def show_platform_input_dialog(hostname):
     
     # Kiểm tra xem người dùng có ấn Hủy không
     if cancelled[0]:
-        print("\n❌ Người dùng đã hủy. Dừng chương trình...")
+        print("\nNgười dùng đã hủy. Dừng chương trình...")
         import sys
         sys.exit(0)
     
-    return result[0] if result[0] else "-"
+    return result
 
-def update_platform_to_server(machine_id, platform_value):
-    """Cập nhật thông tin nền tảng lên server"""
+def update_info_to_server(machine_id, platform_value, hostname_value):
+    """Cập nhật thông tin nền tảng và hostname lên server"""
     try:
-        payload = {"platform": platform_value}
+        payload = {
+            "platform": platform_value,
+            "hostname": hostname_value
+        }
         res = requests.put(
             f"{API_URL}/update/{machine_id}",
             json=payload,
             timeout=5
         )
         if res.status_code == 200:
-            print(f"✓ Đã cập nhật nền tảng: {platform_value}")
+            print(f"Đã cập nhật - Nền tảng: {platform_value} | Hostname: {hostname_value}")
             return True
         else:
-            print(f"✗ Lỗi cập nhật nền tảng: {res.status_code}")
+            print(f"Lỗi cập nhật: {res.status_code}")
             return False
     except Exception as e:
-        print(f"✗ Lỗi kết nối khi cập nhật nền tảng: {e}")
+        print(f"Lỗi kết nối khi cập nhật: {e}")
         return False
 
 def main():
@@ -446,36 +478,45 @@ def main():
     running = True
 
     print(f"Machine ID: {static_info['machine_id']}")
-    print(f"Hostname: {static_info['hostname']}")
     
-    # Kiểm tra xem máy đã tồn tại và có nền tảng chưa
+    current_hostname_system = platform.node()
     exists, machine_data = check_machine_exists(static_info["machine_id"])
-    
-    need_platform_input = False
+    need_input = False
     
     if not exists:
-        # Máy mới → cần nhập nền tảng
-        print("⚠ Máy mới, yêu cầu nhập thông tin nền tảng...")
-        need_platform_input = True
+        print("Máy mới, yêu cầu nhập thông tin...")
+        need_input = True
     elif machine_data:
         current_platform = machine_data.get("platform", "-")
-        print(f"Nền tảng hiện tại: {current_platform}")
+        current_hostname = machine_data.get("hostname", "-")
         
-        # Nếu nền tảng là "-" hoặc rỗng → cần nhập nền tảng
-        if current_platform == "-" or not current_platform:
-            print("⚠ Máy chưa có thông tin nền tảng, yêu cầu nhập...")
-            need_platform_input = True
+        print(f"Nền tảng hiện tại: {current_platform}")
+        print(f"Hostname hiện tại: {current_hostname}")
+        
+        # Nếu thiếu nền tảng HOẶC hostname → cần nhập
+        if current_platform == "-" or not current_platform or current_hostname == "-" or not current_hostname:
+            print("Máy chưa có đầy đủ thông tin, yêu cầu nhập...")
+            need_input = True
         else:
             static_info["platform"] = current_platform
+            static_info["hostname"] = current_hostname
     
     # Hiển thị pop-up nếu cần
-    if need_platform_input:
-        platform_value = show_platform_input_dialog(static_info['hostname'])
-        static_info["platform"] = platform_value
+    if need_input:
+        user_input = show_input_dialog(current_hostname_system)
+        static_info["platform"] = user_input["platform"]
+        static_info["hostname"] = user_input["hostname"]
         
         # Cập nhật lên server nếu máy đã tồn tại
         if exists:
-            update_platform_to_server(static_info["machine_id"], platform_value)
+            update_info_to_server(
+                static_info["machine_id"], 
+                user_input["platform"],
+                user_input["hostname"]
+            )
+
+    print(f"Hostname: {static_info['hostname']}")
+    print(f"Platform: {static_info['platform']}")
 
     _connect_with_backoff(API_URL)
     print("Starting system monitor... (Ctrl+C to stop)")
