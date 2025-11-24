@@ -18,13 +18,19 @@ kernel32 = ctypes.windll.kernel32
 mutex = kernel32.CreateMutexW(None, False, "Global\\MonitorWindowsMutex")
 if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
     current_pid = os.getpid()
-    for proc in psutil.process_iter(['pid', 'name']):
+    killed_any = False
+    for proc in psutil.process_iter(['pid', 'name', 'exe']):
         try:
-            if proc.info['pid'] != current_pid and 'monitor_windows' in proc.info['name'].lower():
-                proc.kill()
-                time.sleep(1)
-                break
+            if proc.info['pid'] != current_pid:
+                proc_name = proc.info['name'].lower() if proc.info['name'] else ''
+                proc_exe = proc.info['exe'].lower() if proc.info['exe'] else ''
+                # Kiểm tra cả tên process và đường dẫn exe
+                if 'monitor_windows' in proc_name or 'monitor_windows.exe' in proc_exe:
+                    proc.kill()
+                    killed_any = True
         except: pass
+    if killed_any:
+        time.sleep(1)
 # ================================================================
 
 sio = socketio.Client(reconnection=True)
