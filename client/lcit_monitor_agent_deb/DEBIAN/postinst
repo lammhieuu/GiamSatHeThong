@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+# Lấy hostname và platform từ biến môi trường (từ lệnh dpkg -i)
+: "${HOSTNAME:=default_host}"
+: "${PLATFORM:=default_platform}"
+
+# Đảm bảo binary có quyền chạy
+chmod 755 /usr/local/bin/lcit-monitor-agent
+
+# Tạo systemd service
+cat > /etc/systemd/system/lcit-monitor-agent.service <<EOL
+[Unit]
+Description=LCIT System Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/lcit-monitor-agent --hostname "$HOSTNAME" --platform "$PLATFORM"
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Reload systemd và enable service
+systemctl daemon-reload
+systemctl enable lcit-monitor-agent
+systemctl restart lcit-monitor-agent || true
+
+exit 0
