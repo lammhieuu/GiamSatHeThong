@@ -1,4 +1,3 @@
-#monitor.py
 import argparse
 import os
 import psutil
@@ -11,6 +10,22 @@ from datetime import datetime
 import requests
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+import sys
+
+# ==================== SINGLE INSTANCE  ====================
+import ctypes
+kernel32 = ctypes.windll.kernel32
+mutex = kernel32.CreateMutexW(None, False, "Global\\MonitorWindowsMutex")
+if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+    current_pid = os.getpid()
+    for proc in psutil.process_iter(['pid', 'name']):
+        try:
+            if proc.info['pid'] != current_pid and 'monitor_windows' in proc.info['name'].lower():
+                proc.kill()
+                time.sleep(1)
+                break
+        except: pass
+# ================================================================
 
 sio = socketio.Client(reconnection=True)
 
@@ -29,7 +44,7 @@ SEND_INTERVAL = max(0.5, float(args.interval))
 # --- Lấy tất cả IP addresses ---
 def get_all_ip_addresses():
     ip_list = []
-    interface_count = {}  # Đếm số lần xuất hiện của mỗi interface
+    interface_count = {}
     
     try:
         for interface, addrs in psutil.net_if_addrs().items():
@@ -37,10 +52,8 @@ def get_all_ip_addresses():
                 if addr.family == socket.AF_INET:
                     ip = addr.address
                     if ip != "127.0.0.1":
-                        # Đếm số lần interface xuất hiện
                         interface_count[interface] = interface_count.get(interface, 0) + 1
                         
-                        # Nếu interface xuất hiện lần thứ 2 trở đi, thêm suffix
                         if interface_count[interface] > 1:
                             display_name = f"{interface} #{interface_count[interface]}"
                         else:
@@ -71,10 +84,8 @@ def get_listening_ports():
     try:
         connections = psutil.net_connections(kind='inet')
         for conn in connections:
-            # Chỉ lấy các cổng đang LISTEN
             if conn.status == 'LISTEN':
                 try:
-                    # Lấy thông tin process
                     process_name = "-"
                     if conn.pid:
                         try:
@@ -83,10 +94,8 @@ def get_listening_ports():
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
                             process_name = "Unknown"
                     
-                    # Xác định protocol
                     protocol = "TCP" if conn.type == socket.SOCK_STREAM else "UDP"
                     
-                    # Lấy địa chỉ và port
                     address = conn.laddr.ip if conn.laddr else "-"
                     port = conn.laddr.port if conn.laddr else 0
                     
@@ -100,7 +109,6 @@ def get_listening_ports():
                 except Exception as e:
                     continue
         
-        # Sắp xếp theo port
         ports_info.sort(key=lambda x: x['port'])
         
     except Exception as e:
@@ -108,7 +116,7 @@ def get_listening_ports():
     
     return ports_info
 
-# --- Lấy thông tin tĩnh (KHÔNG CÒN HOSTNAME) ---
+# --- Lấy thông tin tĩnh ---
 def get_static_info():
     cpu_count = psutil.cpu_count(logical=True)
     ip_addresses = get_all_ip_addresses()
@@ -124,7 +132,7 @@ def get_static_info():
         "disk_total": total_size,
         "disks": disks,
         "platform": "-",
-        "hostname": "-"  # Sẽ được cập nhật từ UI
+        "hostname": "-"
     }
 
 def get_disk_info():
@@ -153,7 +161,6 @@ def get_dynamic_info():
     ip_addresses = get_all_ip_addresses()
     primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
     
-    # Lấy thông tin các cổng đang lắng nghe
     listening_ports = get_listening_ports()
     
     return {
@@ -200,7 +207,6 @@ def _connect_with_backoff(url):
             backoff = min(30, backoff * 1.5)
 
 def check_machine_exists(machine_id):
-    """Kiểm tra xem máy đã tồn tại trong database chưa"""
     try:
         res = requests.get(f"{API_URL}/clients/{machine_id}", timeout=2)
         if res.status_code == 200:
@@ -211,7 +217,6 @@ def check_machine_exists(machine_id):
         return False, None
 
 def show_input_dialog(current_hostname_system):
-    """Hiển thị popup để nhập thông tin nền tảng và tên máy chủ"""
     result = {"platform": None, "hostname": None}
     cancelled = [False]
     
@@ -225,7 +230,6 @@ def show_input_dialog(current_hostname_system):
             platform_entry.config(state='disabled')
     
     def on_save():
-        # Lấy platform
         selected_platform = platform_combo.get()
         if selected_platform == "Khác":
             platform_value = platform_entry.get().strip()
@@ -238,27 +242,22 @@ def show_input_dialog(current_hostname_system):
             error_label.config(text="Vui lòng chọn nền tảng!")
             return
         
-        # Lấy hostname
         hostname_value = hostname_entry.get().strip()
         if not hostname_value:
             error_label.config(text="Vui lòng nhập tên máy chủ!")
             return
         
-        # Lưu kết quả
         result["platform"] = platform_value
         result["hostname"] = hostname_value
         dialog.destroy()
     
     def on_cancel():
-        """Hủy và dừng chương trình"""
         cancelled[0] = True
         dialog.destroy()
     
     def on_close():
-        """Xử lý khi đóng cửa sổ bằng nút X"""
         on_cancel()
     
-    # Tạo cửa sổ dialog
     dialog = tk.Tk()
     dialog.title("Cấu hình hệ thống")
     dialog.geometry("450x500")
@@ -266,29 +265,24 @@ def show_input_dialog(current_hostname_system):
     dialog.configure(bg="#f8f9fa")
     dialog.protocol("WM_DELETE_WINDOW", on_close)
     
-    # Tăng DPI awareness
     try:
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
     except:
         pass
     
-    # Đưa cửa sổ lên phía trước và giữa màn hình
     dialog.attributes('-topmost', True)
     dialog.lift()
     dialog.focus_force()
     
-    # Căn giữa màn hình
     dialog.update_idletasks()
     x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
     y = (dialog.winfo_screenheight() // 2) - (450 // 2)
     dialog.geometry(f"450x450+{x}+{y}")
     
-    # Frame chính với padding
     main_frame = tk.Frame(dialog, bg="#f8f9fa", padx=35, pady=30)
     main_frame.pack(fill=tk.BOTH, expand=True)
     
-    # Tiêu đề
     title_label = tk.Label(
         main_frame,
         text="📋 Nhập Thông Tin Hệ Thống",
@@ -297,17 +291,6 @@ def show_input_dialog(current_hostname_system):
         fg="#1a1a1a"
     )
     title_label.pack(pady=(0, 5))
-    
-    # # Thông tin machine ID
-    # info_label = tk.Label(
-    #     main_frame,
-    #     text=f"Machine ID: {static_info['machine_id']}\nHệ điều hành: {current_hostname_system}",
-    #     font=("Segoe UI", 9),
-    #     bg="#f8f9fa",
-    #     fg="#6c757d",
-    #     justify=tk.LEFT
-    # )
-    # info_label.pack(pady=(0, 20))
     
     platform_label = tk.Label(
         main_frame,
@@ -318,10 +301,8 @@ def show_input_dialog(current_hostname_system):
     )
     platform_label.pack(anchor=tk.W, pady=(0, 8))
     
-    # Import ttk cho Combobox
     from tkinter import ttk
     
-    # Tạo style cho combobox
     style = ttk.Style()
     style.theme_use('clam')
     style.configure(
@@ -334,7 +315,6 @@ def show_input_dialog(current_hostname_system):
         borderwidth=1
     )
     
-    # Selectbox Nền tảng
     platforms = ["Viettel Cloud", "VNTP Cloud", "TTCNTT LC", "Khác"]
     platform_combo = ttk.Combobox(
         main_frame,
@@ -348,7 +328,6 @@ def show_input_dialog(current_hostname_system):
     platform_combo.set("Viettel Cloud")
     platform_combo.bind('<<ComboboxSelected>>', on_selection_change)
     
-    # Entry cho trường hợp chọn "Khác"
     platform_entry = tk.Entry(
         main_frame,
         font=("Segoe UI", 10),
@@ -371,7 +350,6 @@ def show_input_dialog(current_hostname_system):
     )
     hostname_label.pack(anchor=tk.W, pady=(20, 8))
     
-    # Entry cho hostname
     hostname_entry = tk.Entry(
         main_frame,
         font=("Segoe UI", 10),
@@ -381,9 +359,8 @@ def show_input_dialog(current_hostname_system):
         bd=1
     )
     hostname_entry.pack(fill=tk.X, ipady=6)
-    hostname_entry.insert(0, current_hostname_system)  # Gợi ý tên hệ thống hiện tại
+    hostname_entry.insert(0, current_hostname_system)
     
-    # Label lỗi
     error_label = tk.Label(
         main_frame,
         text="",
@@ -393,11 +370,9 @@ def show_input_dialog(current_hostname_system):
     )
     error_label.pack(pady=(8, 10))
     
-    # Frame chứa các nút
     button_frame = tk.Frame(main_frame, bg="#f8f9fa")
     button_frame.pack(pady=(15, 0))
     
-    # Nút Lưu
     save_btn = tk.Button(
         button_frame,
         text="💾 Lưu",
@@ -416,7 +391,6 @@ def show_input_dialog(current_hostname_system):
     )
     save_btn.pack(side=tk.LEFT, padx=5)
     
-    # Nút Hủy
     cancel_btn = tk.Button(
         button_frame,
         text="✖ Hủy",
@@ -435,23 +409,18 @@ def show_input_dialog(current_hostname_system):
     )
     cancel_btn.pack(side=tk.LEFT, padx=5)
     
-    # Bind Enter key
     dialog.bind('<Return>', lambda e: on_save())
     dialog.bind('<Escape>', lambda e: on_cancel())
     
-    # Chạy dialog
     dialog.mainloop()
     
-    # Kiểm tra xem người dùng có ấn Hủy không
     if cancelled[0]:
         print("\nNgười dùng đã hủy. Dừng chương trình...")
-        import sys
         sys.exit(0)
     
     return result
 
 def update_info_to_server(machine_id, platform_value, hostname_value):
-    """Cập nhật thông tin nền tảng và hostname lên server"""
     try:
         payload = {
             "platform": platform_value,
@@ -493,7 +462,6 @@ def main():
         print(f"Nền tảng hiện tại: {current_platform}")
         print(f"Hostname hiện tại: {current_hostname}")
         
-        # Nếu thiếu nền tảng HOẶC hostname → cần nhập
         if current_platform == "-" or not current_platform or current_hostname == "-" or not current_hostname:
             print("Máy chưa có đầy đủ thông tin, yêu cầu nhập...")
             need_input = True
@@ -501,13 +469,11 @@ def main():
             static_info["platform"] = current_platform
             static_info["hostname"] = current_hostname
     
-    # Hiển thị pop-up nếu cần
     if need_input:
         user_input = show_input_dialog(current_hostname_system)
         static_info["platform"] = user_input["platform"]
         static_info["hostname"] = user_input["hostname"]
         
-        # Cập nhật lên server nếu máy đã tồn tại
         if exists:
             update_info_to_server(
                 static_info["machine_id"], 
