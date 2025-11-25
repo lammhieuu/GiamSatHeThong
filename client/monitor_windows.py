@@ -24,7 +24,6 @@ if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
             if proc.info['pid'] != current_pid:
                 proc_name = proc.info['name'].lower() if proc.info['name'] else ''
                 proc_exe = proc.info['exe'].lower() if proc.info['exe'] else ''
-                # Kiểm tra cả tên process và đường dẫn exe
                 if 'monitor_windows' in proc_name or 'monitor_windows.exe' in proc_exe:
                     proc.kill()
                     killed_any = True
@@ -46,6 +45,127 @@ args = parser.parse_args()
 
 API_URL = args.api
 SEND_INTERVAL = max(0.5, float(args.interval))
+
+# ==================== AUTO START FUNCTIONS ====================
+def get_startup_folder():
+    """Lấy đường dẫn thư mục Startup của Windows"""
+    startup_folder = os.path.join(
+        os.getenv('APPDATA'),
+        r'Microsoft\Windows\Start Menu\Programs\Startup'
+    )
+    return startup_folder
+
+def get_shortcut_path():
+    """Lấy đường dẫn file shortcut"""
+    return os.path.join(get_startup_folder(), "MonitorWindows.lnk")
+
+def get_disabled_shortcut_path():
+    """Lấy đường dẫn file shortcut khi disabled (thêm .disabled)"""
+    return os.path.join(get_startup_folder(), "MonitorWindows.lnk.disabled")
+
+def is_autostart_enabled():
+    """Kiểm tra xem auto start đã được bật chưa (file .lnk tồn tại và KHÔNG có .disabled)"""
+    shortcut_path = get_shortcut_path()
+    disabled_path = get_disabled_shortcut_path()
+    
+    # Nếu có file .disabled thì là disabled
+    if os.path.exists(disabled_path):
+        return False
+    
+    # Nếu có file .lnk thì là enabled
+    return os.path.exists(shortcut_path)
+
+def create_shortcut_powershell(target_path, shortcut_path):
+    """Tạo shortcut bằng PowerShell (không cần thư viện)"""
+    try:
+        # Escape đường dẫn cho PowerShell
+        target_escaped = target_path.replace("'", "''")
+        shortcut_escaped = shortcut_path.replace("'", "''")
+        working_dir = os.path.dirname(target_path).replace("'", "''")
+        
+        # Tạo script PowerShell
+        ps_script = f"""
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut('{shortcut_escaped}')
+$Shortcut.TargetPath = '{target_escaped}'
+$Shortcut.WorkingDirectory = '{working_dir}'
+$Shortcut.Description = 'Monitor Windows System'
+$Shortcut.Save()
+"""
+        
+        # Chạy PowerShell command
+        import subprocess
+        result = subprocess.run(
+            ['powershell', '-Command', ps_script],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+        )
+        
+        return result.returncode == 0
+            
+    except:
+        return False
+
+def enable_autostart():
+    """Bật auto start: Nếu chưa có thì tạo mới, nếu đã có thì rename từ .disabled"""
+    try:
+        app_path = sys.executable
+        startup_folder = get_startup_folder()
+        os.makedirs(startup_folder, exist_ok=True)
+        
+        shortcut_path = get_shortcut_path()
+        disabled_path = get_disabled_shortcut_path()
+        
+        # Nếu có file .disabled, đổi tên thành .lnk (enable)
+        if os.path.exists(disabled_path):
+            os.rename(disabled_path, shortcut_path)
+            return True
+        
+        # Nếu đã có file .lnk thì không làm gì
+        if os.path.exists(shortcut_path):
+            return True
+        
+        # Nếu chưa có gì, tạo mới shortcut
+        success = create_shortcut_powershell(app_path, shortcut_path)
+        return success and os.path.exists(shortcut_path)
+        
+    except:
+        return False
+
+def disable_autostart():
+    """Tắt auto start: Rename .lnk thành .disabled (không xóa)"""
+    try:
+        shortcut_path = get_shortcut_path()
+        disabled_path = get_disabled_shortcut_path()
+        
+        # Nếu có file .lnk, đổi tên thành .disabled
+        if os.path.exists(shortcut_path):
+            # Xóa file .disabled cũ nếu có
+            if os.path.exists(disabled_path):
+                os.remove(disabled_path)
+            os.rename(shortcut_path, disabled_path)
+        
+        return True
+    except:
+        return False
+
+def remove_autostart():
+    """Xóa hoàn toàn shortcut (dùng khi server delete)"""
+    try:
+        shortcut_path = get_shortcut_path()
+        disabled_path = get_disabled_shortcut_path()
+        
+        if os.path.exists(shortcut_path):
+            os.remove(shortcut_path)
+        
+        if os.path.exists(disabled_path):
+            os.remove(disabled_path)
+        
+        return True
+    except:
+        return False
+# ================================================================
 
 # --- Lấy tất cả IP addresses ---
 def get_all_ip_addresses():
@@ -194,6 +314,10 @@ def disconnect():
 def stop_monitor(data):
     machine_id = data.get("machine_id")
     if machine_id == static_info["machine_id"]:
+        # Xóa hoàn toàn shortcut khi server delete
+        remove_autostart()
+        
+        # Dừng chương trình
         global running
         running = False
         try:
@@ -266,7 +390,7 @@ def show_input_dialog(current_hostname_system):
     
     dialog = tk.Tk()
     dialog.title("Cấu hình hệ thống")
-    dialog.geometry("450x500")
+    dialog.geometry("450x450")
     dialog.resizable(False, False)
     dialog.configure(bg="#f8f9fa")
     dialog.protocol("WM_DELETE_WINDOW", on_close)
@@ -486,6 +610,9 @@ def main():
                 user_input["platform"],
                 user_input["hostname"]
             )
+    
+    # Tự động enable startup mỗi lần khởi động
+    enable_autostart()
 
     print(f"Hostname: {static_info['hostname']}")
     print(f"Platform: {static_info['platform']}")
