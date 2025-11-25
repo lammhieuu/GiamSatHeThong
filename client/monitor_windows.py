@@ -6,260 +6,133 @@ import platform
 import time
 import socket
 import uuid
-from datetime import datetime
 import requests
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import ttk
+from datetime import datetime
 import sys
-
-# ==================== SINGLE INSTANCE  ====================
+import subprocess
 import ctypes
+
+# ==================== SINGLE INSTANCE ====================
 kernel32 = ctypes.windll.kernel32
 mutex = kernel32.CreateMutexW(None, False, "Global\\MonitorWindowsMutex")
-if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+if kernel32.GetLastError() == 183:
     current_pid = os.getpid()
-    killed_any = False
     for proc in psutil.process_iter(['pid', 'name', 'exe']):
         try:
-            if proc.info['pid'] != current_pid:
-                proc_name = proc.info['name'].lower() if proc.info['name'] else ''
-                proc_exe = proc.info['exe'].lower() if proc.info['exe'] else ''
-                if 'monitor_windows' in proc_name or 'monitor_windows.exe' in proc_exe:
+            if proc.info['pid'] != current_pid and proc.info['name'] and proc.info['exe']:
+                name, exe = proc.info['name'].lower(), proc.info['exe'].lower()
+                if 'monitor_windows' in name or 'monitor_windows.exe' in exe:
                     proc.kill()
-                    killed_any = True
         except: pass
-    if killed_any:
-        time.sleep(1)
-# ================================================================
+    time.sleep(1)
 
-sio = socketio.Client(reconnection=True)
-
-# --- Cấu hình backend API ---
-def _get_default_api():
-    return os.getenv("MONITOR_API_URL", "https://monitor.lcit.vn:4001")
-
+# ==================== CONFIG ====================
 parser = argparse.ArgumentParser(description="Lightweight system monitor client")
-parser.add_argument("--api", "-a", help="Backend API URL", default=_get_default_api())
-parser.add_argument("--interval", "-i", type=float, help="Send interval in seconds", default=2.0)
+parser.add_argument("--api", "-a", default=os.getenv("MONITOR_API_URL", "https://monitor.lcit.vn:4001"))
+parser.add_argument("--interval", "-i", type=float, default=.0)
 args = parser.parse_args()
 
 API_URL = args.api
-SEND_INTERVAL = max(0.5, float(args.interval))
+SEND_INTERVAL = max(0.5, args.interval)
+sio = socketio.Client(reconnection=True)
 
-# ==================== AUTO START FUNCTIONS ====================
-def get_startup_folder():
-    """Lấy đường dẫn thư mục Startup của Windows"""
-    startup_folder = os.path.join(
-        os.getenv('APPDATA'),
-        r'Microsoft\Windows\Start Menu\Programs\Startup'
-    )
-    return startup_folder
-
-def get_shortcut_path():
-    """Lấy đường dẫn file shortcut"""
-    return os.path.join(get_startup_folder(), "MonitorWindows.lnk")
-
-def get_disabled_shortcut_path():
-    """Lấy đường dẫn file shortcut khi disabled (thêm .disabled)"""
-    return os.path.join(get_startup_folder(), "MonitorWindows.lnk.disabled")
+# ==================== AUTO START ====================
+STARTUP_FOLDER = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup')
+SHORTCUT_PATH = os.path.join(STARTUP_FOLDER, "MonitorWindows.lnk")
+DISABLED_PATH = SHORTCUT_PATH + ".disabled"
 
 def is_autostart_enabled():
-    """Kiểm tra xem auto start đã được bật chưa (file .lnk tồn tại và KHÔNG có .disabled)"""
-    shortcut_path = get_shortcut_path()
-    disabled_path = get_disabled_shortcut_path()
-    
-    # Nếu có file .disabled thì là disabled
-    if os.path.exists(disabled_path):
-        return False
-    
-    # Nếu có file .lnk thì là enabled
-    return os.path.exists(shortcut_path)
+    return not os.path.exists(DISABLED_PATH) and os.path.exists(SHORTCUT_PATH)
 
-def create_shortcut_powershell(target_path, shortcut_path):
-    """Tạo shortcut bằng PowerShell (không cần thư viện)"""
-    try:
-        # Escape đường dẫn cho PowerShell
-        target_escaped = target_path.replace("'", "''")
-        shortcut_escaped = shortcut_path.replace("'", "''")
-        working_dir = os.path.dirname(target_path).replace("'", "''")
-        
-        # Tạo script PowerShell
-        ps_script = f"""
+def create_shortcut_powershell(target, shortcut):
+    ps_script = f"""
 $WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut('{shortcut_escaped}')
-$Shortcut.TargetPath = '{target_escaped}'
-$Shortcut.WorkingDirectory = '{working_dir}'
+$Shortcut = $WshShell.CreateShortcut('{shortcut.replace("'", "''")}')
+$Shortcut.TargetPath = '{target.replace("'", "''")}'
+$Shortcut.WorkingDirectory = '{os.path.dirname(target).replace("'", "''")}'
 $Shortcut.Description = 'Monitor Windows System'
 $Shortcut.Save()
 """
-        
-        # Chạy PowerShell command
-        import subprocess
-        result = subprocess.run(
-            ['powershell', '-Command', ps_script],
-            capture_output=True,
-            text=True,
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-        )
-        
+    try:
+        result = subprocess.run(['powershell', '-Command', ps_script], 
+                              capture_output=True, 
+                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         return result.returncode == 0
-            
     except:
         return False
 
 def enable_autostart():
-    """Bật auto start: Nếu chưa có thì tạo mới, nếu đã có thì rename từ .disabled"""
     try:
-        app_path = sys.executable
-        startup_folder = get_startup_folder()
-        os.makedirs(startup_folder, exist_ok=True)
-        
-        shortcut_path = get_shortcut_path()
-        disabled_path = get_disabled_shortcut_path()
-        
-        # Nếu có file .disabled, đổi tên thành .lnk (enable)
-        if os.path.exists(disabled_path):
-            os.rename(disabled_path, shortcut_path)
+        os.makedirs(STARTUP_FOLDER, exist_ok=True)
+        if os.path.exists(DISABLED_PATH):
+            os.rename(DISABLED_PATH, SHORTCUT_PATH)
             return True
-        
-        # Nếu đã có file .lnk thì không làm gì
-        if os.path.exists(shortcut_path):
+        if os.path.exists(SHORTCUT_PATH):
             return True
-        
-        # Nếu chưa có gì, tạo mới shortcut
-        success = create_shortcut_powershell(app_path, shortcut_path)
-        return success and os.path.exists(shortcut_path)
-        
+        return create_shortcut_powershell(sys.executable, SHORTCUT_PATH)
     except:
         return False
 
 def disable_autostart():
-    """Tắt auto start: Rename .lnk thành .disabled (không xóa)"""
     try:
-        shortcut_path = get_shortcut_path()
-        disabled_path = get_disabled_shortcut_path()
-        
-        # Nếu có file .lnk, đổi tên thành .disabled
-        if os.path.exists(shortcut_path):
-            # Xóa file .disabled cũ nếu có
-            if os.path.exists(disabled_path):
-                os.remove(disabled_path)
-            os.rename(shortcut_path, disabled_path)
-        
+        if os.path.exists(SHORTCUT_PATH):
+            if os.path.exists(DISABLED_PATH):
+                os.remove(DISABLED_PATH)
+            os.rename(SHORTCUT_PATH, DISABLED_PATH)
         return True
     except:
         return False
 
 def remove_autostart():
-    """Xóa hoàn toàn shortcut (dùng khi server delete)"""
     try:
-        shortcut_path = get_shortcut_path()
-        disabled_path = get_disabled_shortcut_path()
-        
-        if os.path.exists(shortcut_path):
-            os.remove(shortcut_path)
-        
-        if os.path.exists(disabled_path):
-            os.remove(disabled_path)
-        
+        for path in [SHORTCUT_PATH, DISABLED_PATH]:
+            if os.path.exists(path):
+                os.remove(path)
         return True
     except:
         return False
-# ================================================================
 
-# --- Lấy tất cả IP addresses ---
+# ==================== SYSTEM INFO ====================
 def get_all_ip_addresses():
-    ip_list = []
-    interface_count = {}
-    
+    ip_list, interface_count = [], {}
     try:
         for interface, addrs in psutil.net_if_addrs().items():
             for addr in addrs:
-                if addr.family == socket.AF_INET:
-                    ip = addr.address
-                    if ip != "127.0.0.1":
-                        interface_count[interface] = interface_count.get(interface, 0) + 1
-                        
-                        if interface_count[interface] > 1:
-                            display_name = f"{interface} #{interface_count[interface]}"
-                        else:
-                            display_name = interface
-                        
-                        ip_list.append({
-                            "interface": display_name,
-                            "ip": ip
-                        })
-        
-        if not ip_list:
-            ip_list.append({
-                "interface": "lo",
-                "ip": "127.0.0.1"
-            })
-    except Exception as e:
-        print(f"Error getting IP addresses: {e}")
-        ip_list.append({
-            "interface": "unknown",
-            "ip": "127.0.0.1"
-        })
-    
-    return ip_list
+                if addr.family == socket.AF_INET and addr.address != "127.0.0.1":
+                    interface_count[interface] = interface_count.get(interface, 0) + 1
+                    display = f"{interface} #{interface_count[interface]}" if interface_count[interface] > 1 else interface
+                    ip_list.append({"interface": display, "ip": addr.address})
+        return ip_list or [{"interface": "lo", "ip": "127.0.0.1"}]
+    except:
+        return [{"interface": "unknown", "ip": "127.0.0.1"}]
 
-# --- Lấy thông tin các cổng đang lắng nghe ---
 def get_listening_ports():
-    ports_info = []
+    ports = []
     try:
-        connections = psutil.net_connections(kind='inet')
-        for conn in connections:
-            if conn.status == 'LISTEN':
+        for conn in psutil.net_connections(kind='inet'):
+            if conn.status == 'LISTEN' and conn.laddr:
                 try:
-                    process_name = "-"
+                    proc_name = "-"
                     if conn.pid:
                         try:
-                            proc = psutil.Process(conn.pid)
-                            process_name = proc.name()
+                            proc_name = psutil.Process(conn.pid).name()
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            process_name = "Unknown"
-                    
-                    protocol = "TCP" if conn.type == socket.SOCK_STREAM else "UDP"
-                    
-                    address = conn.laddr.ip if conn.laddr else "-"
-                    port = conn.laddr.port if conn.laddr else 0
-                    
-                    ports_info.append({
-                        "protocol": protocol,
-                        "address": address,
-                        "port": port,
+                            proc_name = "Unknown"
+                    ports.append({
+                        "protocol": "TCP" if conn.type == socket.SOCK_STREAM else "UDP",
+                        "address": conn.laddr.ip,
+                        "port": conn.laddr.port,
                         "pid": conn.pid or 0,
-                        "process": process_name
+                        "process": proc_name
                     })
-                except Exception as e:
+                except:
                     continue
-        
-        ports_info.sort(key=lambda x: x['port'])
-        
-    except Exception as e:
-        print(f"Error getting listening ports: {e}")
-    
-    return ports_info
-
-# --- Lấy thông tin tĩnh ---
-def get_static_info():
-    cpu_count = psutil.cpu_count(logical=True)
-    ip_addresses = get_all_ip_addresses()
-    primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
-    disks, total_used, total_size = get_disk_info()
-    
-    return {
-        "machine_id": hex(uuid.getnode())[2:],
-        "os": platform.system() + " " + platform.release(),
-        "ip": primary_ip,
-        "ip_addresses": ip_addresses,
-        "cpu_count": cpu_count,
-        "disk_total": total_size,
-        "disks": disks,
-        "platform": "-",
-        "hostname": "-"
-    }
+        ports.sort(key=lambda x: x['port'])
+    except:
+        pass
+    return ports
 
 def get_disk_info():
     disks, total_used, total_size = [], 0, 0
@@ -279,29 +152,39 @@ def get_disk_info():
             continue
     return disks, total_used / (1024**3), total_size / (1024**3)
 
+def get_static_info():
+    ip_addresses = get_all_ip_addresses()
+    disks, _, total_size = get_disk_info()
+    return {
+        "machine_id": hex(uuid.getnode())[2:],
+        "os": f"{platform.system()} {platform.release()}",
+        "ip": ip_addresses[0]["ip"],
+        "ip_addresses": ip_addresses,
+        "cpu_count": psutil.cpu_count(logical=True),
+        "disk_total": total_size,
+        "disks": disks,
+        "platform": "-",
+        "hostname": "-"
+    }
 
 def get_dynamic_info():
     ram = psutil.virtual_memory()
-    cpu_percent = psutil.cpu_percent(interval=None)
     disks, total_used, _ = get_disk_info()
     ip_addresses = get_all_ip_addresses()
-    primary_ip = ip_addresses[0]["ip"] if ip_addresses else "127.0.0.1"
-    
-    listening_ports = get_listening_ports()
-    
     return {
-        "cpu_percent": cpu_percent,
+        "cpu_percent": psutil.cpu_percent(interval=None),
         "ram_used": ram.used / (1024**3),
         "ram_total": ram.total / (1024**3),
         "ram_percent": ram.percent,
         "disk_used": total_used,
         "disks": disks,
-        "ip": primary_ip,
+        "ip": ip_addresses[0]["ip"],
         "ip_addresses": ip_addresses,
-        "listening_ports": listening_ports,
+        "listening_ports": get_listening_ports(),
         "last_update": datetime.now().isoformat()
     }
 
+# ==================== SOCKET EVENTS ====================
 @sio.event
 def connect():
     pass
@@ -312,12 +195,8 @@ def disconnect():
 
 @sio.on("stop_monitor")
 def stop_monitor(data):
-    machine_id = data.get("machine_id")
-    if machine_id == static_info["machine_id"]:
-        # Xóa hoàn toàn shortcut khi server delete
+    if data.get("machine_id") == static_info["machine_id"]:
         remove_autostart()
-        
-        # Dừng chương trình
         global running
         running = False
         try:
@@ -325,6 +204,7 @@ def stop_monitor(data):
         except:
             pass
 
+# ==================== SERVER COMMUNICATION ====================
 def _connect_with_backoff(url):
     backoff = 1.0
     while True:
@@ -339,40 +219,44 @@ def _connect_with_backoff(url):
 def check_machine_exists(machine_id):
     try:
         res = requests.get(f"{API_URL}/clients/{machine_id}", timeout=2)
-        if res.status_code == 200:
-            data = res.json()
-            return True, data
-        return False, None
+        return (True, res.json()) if res.status_code == 200 else (False, None)
     except:
         return False, None
 
+def update_info_to_server(machine_id, platform_value, hostname_value):
+    try:
+        res = requests.put(f"{API_URL}/update/{machine_id}",
+                          json={"platform": platform_value, "hostname": hostname_value},
+                          timeout=5)
+        if res.status_code == 200:
+            print(f"Đã cập nhật - Nền tảng: {platform_value} | Hostname: {hostname_value}")
+            return True
+        print(f"Lỗi cập nhật: {res.status_code}")
+    except Exception as e:
+        print(f"Lỗi kết nối khi cập nhật: {e}")
+    return False
+
+# ==================== UI DIALOG ====================
 def show_input_dialog(current_hostname_system):
     result = {"platform": None, "hostname": None}
     cancelled = [False]
     
     def on_selection_change(event):
-        selected = platform_combo.get()
-        if selected == "Khác":
-            platform_entry.config(state='normal')
+        state = 'normal' if platform_combo.get() == "Khác" else 'disabled'
+        platform_entry.config(state=state)
+        if state == 'normal':
             platform_entry.focus()
         else:
             platform_entry.delete(0, tk.END)
-            platform_entry.config(state='disabled')
     
     def on_save():
-        selected_platform = platform_combo.get()
-        if selected_platform == "Khác":
-            platform_value = platform_entry.get().strip()
-            if not platform_value:
-                error_label.config(text="Vui lòng nhập nền tảng!")
-                return
-        elif selected_platform:
-            platform_value = selected_platform
-        else:
-            error_label.config(text="Vui lòng chọn nền tảng!")
-            return
-        
+        selected = platform_combo.get()
+        platform_value = platform_entry.get().strip() if selected == "Khác" else selected
         hostname_value = hostname_entry.get().strip()
+        
+        if not platform_value:
+            error_label.config(text="Vui lòng chọn/nhập nền tảng!")
+            return
         if not hostname_value:
             error_label.config(text="Vui lòng nhập tên máy chủ!")
             return
@@ -385,19 +269,15 @@ def show_input_dialog(current_hostname_system):
         cancelled[0] = True
         dialog.destroy()
     
-    def on_close():
-        on_cancel()
-    
     dialog = tk.Tk()
     dialog.title("Cấu hình hệ thống")
     dialog.geometry("450x450")
     dialog.resizable(False, False)
     dialog.configure(bg="#f8f9fa")
-    dialog.protocol("WM_DELETE_WINDOW", on_close)
+    dialog.protocol("WM_DELETE_WINDOW", on_cancel)
     
     try:
-        from ctypes import windll
-        windll.shcore.SetProcessDpiAwareness(1)
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except:
         pass
     
@@ -405,143 +285,63 @@ def show_input_dialog(current_hostname_system):
     dialog.lift()
     dialog.focus_force()
     
-    dialog.update_idletasks()
-    x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-    y = (dialog.winfo_screenheight() // 2) - (450 // 2)
+    x = (dialog.winfo_screenwidth() - 450) // 2
+    y = (dialog.winfo_screenheight() - 450) // 2
     dialog.geometry(f"450x450+{x}+{y}")
     
     main_frame = tk.Frame(dialog, bg="#f8f9fa", padx=35, pady=30)
     main_frame.pack(fill=tk.BOTH, expand=True)
     
-    title_label = tk.Label(
-        main_frame,
-        text="📋 Nhập Thông Tin Hệ Thống",
-        font=("Segoe UI", 16, "bold"),
-        bg="#f8f9fa",
-        fg="#1a1a1a"
-    )
-    title_label.pack(pady=(0, 5))
+    tk.Label(main_frame, text="📋 Nhập Thông Tin Hệ Thống",
+             font=("Segoe UI", 16, "bold"), bg="#f8f9fa", fg="#1a1a1a").pack(pady=(0, 5))
     
-    platform_label = tk.Label(
-        main_frame,
-        text="Chọn nền tảng:",
-        font=("Segoe UI", 10, "bold"),
-        bg="#f8f9fa",
-        fg="#1a1a1a"
-    )
-    platform_label.pack(anchor=tk.W, pady=(0, 8))
-    
-    from tkinter import ttk
+    tk.Label(main_frame, text="Chọn nền tảng:",
+             font=("Segoe UI", 10, "bold"), bg="#f8f9fa", fg="#1a1a1a").pack(anchor=tk.W, pady=(0, 8))
     
     style = ttk.Style()
     style.theme_use('clam')
-    style.configure(
-        'Custom.TCombobox',
-        fieldbackground='white',
-        background='white',
-        bordercolor='#ced4da',
-        arrowcolor='#495057',
-        relief='solid',
-        borderwidth=1
-    )
+    style.configure('Custom.TCombobox', fieldbackground='white', background='white',
+                   bordercolor='#ced4da', arrowcolor='#495057', relief='solid', borderwidth=1)
     
-    platforms = ["Viettel Cloud", "VNTP Cloud", "TTCNTT LC", "Khác"]
-    platform_combo = ttk.Combobox(
-        main_frame,
-        values=platforms,
-        font=("Segoe UI", 10),
-        state='readonly',
-        style='Custom.TCombobox',
-        height=10
-    )
+    platform_combo = ttk.Combobox(main_frame, values=["Viettel Cloud", "VNTP Cloud", "TTCNTT LC", "Khác"],
+                                 font=("Segoe UI", 10), state='readonly', style='Custom.TCombobox', height=10)
     platform_combo.pack(fill=tk.X, ipady=6)
     platform_combo.set("Viettel Cloud")
     platform_combo.bind('<<ComboboxSelected>>', on_selection_change)
     
-    platform_entry = tk.Entry(
-        main_frame,
-        font=("Segoe UI", 10),
-        relief=tk.SOLID,
-        borderwidth=1,
-        state='disabled',
-        disabledbackground='#e9ecef',
-        disabledforeground='#6c757d',
-        highlightthickness=0,
-        bd=1
-    )
+    platform_entry = tk.Entry(main_frame, font=("Segoe UI", 10), relief=tk.SOLID, borderwidth=1,
+                             state='disabled', disabledbackground='#e9ecef', disabledforeground='#6c757d',
+                             highlightthickness=0, bd=1)
     platform_entry.pack(fill=tk.X, ipady=6, pady=(10, 0))
     
-    hostname_label = tk.Label(
-        main_frame,
-        text="Nhập tên máy chủ:",
-        font=("Segoe UI", 10, "bold"),
-        bg="#f8f9fa",
-        fg="#1a1a1a"
-    )
-    hostname_label.pack(anchor=tk.W, pady=(20, 8))
+    tk.Label(main_frame, text="Nhập tên máy chủ:",
+             font=("Segoe UI", 10, "bold"), bg="#f8f9fa", fg="#1a1a1a").pack(anchor=tk.W, pady=(20, 8))
     
-    hostname_entry = tk.Entry(
-        main_frame,
-        font=("Segoe UI", 10),
-        relief=tk.SOLID,
-        borderwidth=1,
-        highlightthickness=0,
-        bd=1
-    )
+    hostname_entry = tk.Entry(main_frame, font=("Segoe UI", 10), relief=tk.SOLID,
+                             borderwidth=1, highlightthickness=0, bd=1)
     hostname_entry.pack(fill=tk.X, ipady=6)
     hostname_entry.insert(0, current_hostname_system)
     
-    error_label = tk.Label(
-        main_frame,
-        text="",
-        font=("Segoe UI", 9),
-        bg="#f8f9fa",
-        fg="#dc3545"
-    )
+    error_label = tk.Label(main_frame, text="", font=("Segoe UI", 9),
+                          bg="#f8f9fa", fg="#dc3545")
     error_label.pack(pady=(8, 10))
     
     button_frame = tk.Frame(main_frame, bg="#f8f9fa")
     button_frame.pack(pady=(15, 0))
     
-    save_btn = tk.Button(
-        button_frame,
-        text="💾 Lưu",
-        font=("Segoe UI", 10, "bold"),
-        bg="#28a745",
-        fg="white",
-        activebackground="#218838",
-        activeforeground="white",
-        relief=tk.FLAT,
-        cursor="hand2",
-        padx=30,
-        pady=10,
-        command=on_save,
-        borderwidth=0,
-        highlightthickness=0
-    )
-    save_btn.pack(side=tk.LEFT, padx=5)
+    btn_style = {"font": ("Segoe UI", 10, "bold"), "relief": tk.FLAT, "cursor": "hand2",
+                "padx": 30, "pady": 10, "borderwidth": 0, "highlightthickness": 0}
     
-    cancel_btn = tk.Button(
-        button_frame,
-        text="✖ Hủy",
-        font=("Segoe UI", 10, "bold"),
-        bg="#dc3545",
-        fg="white",
-        activebackground="#c82333",
-        activeforeground="white",
-        relief=tk.FLAT,
-        cursor="hand2",
-        padx=25,
-        pady=10,
-        command=on_cancel,
-        borderwidth=0,
-        highlightthickness=0
-    )
-    cancel_btn.pack(side=tk.LEFT, padx=5)
+    tk.Button(button_frame, text="💾 Lưu", bg="#28a745", fg="white",
+             activebackground="#218838", activeforeground="white",
+             command=on_save, **btn_style).pack(side=tk.LEFT, padx=5)
+    
+    tk.Button(button_frame, text="✖ Hủy", bg="#dc3545", fg="white",
+             activebackground="#c82333", activeforeground="white",
+             command=on_cancel, **{**btn_style, "padx": 25}).pack(side=tk.LEFT, padx=5)
     
     dialog.bind('<Return>', lambda e: on_save())
     dialog.bind('<Escape>', lambda e: on_cancel())
-    
     dialog.mainloop()
     
     if cancelled[0]:
@@ -550,27 +350,7 @@ def show_input_dialog(current_hostname_system):
     
     return result
 
-def update_info_to_server(machine_id, platform_value, hostname_value):
-    try:
-        payload = {
-            "platform": platform_value,
-            "hostname": hostname_value
-        }
-        res = requests.put(
-            f"{API_URL}/update/{machine_id}",
-            json=payload,
-            timeout=5
-        )
-        if res.status_code == 200:
-            print(f"Đã cập nhật - Nền tảng: {platform_value} | Hostname: {hostname_value}")
-            return True
-        else:
-            print(f"Lỗi cập nhật: {res.status_code}")
-            return False
-    except Exception as e:
-        print(f"Lỗi kết nối khi cập nhật: {e}")
-        return False
-
+# ==================== MAIN ====================
 def main():
     global static_info, running
     static_info = get_static_info()
@@ -578,7 +358,7 @@ def main():
 
     print(f"Machine ID: {static_info['machine_id']}")
     
-    current_hostname_system = platform.node()
+    current_hostname = platform.node()
     exists, machine_data = check_machine_exists(static_info["machine_id"])
     need_input = False
     
@@ -586,36 +366,27 @@ def main():
         print("Máy mới, yêu cầu nhập thông tin...")
         need_input = True
     elif machine_data:
-        current_platform = machine_data.get("platform", "-")
-        current_hostname = machine_data.get("hostname", "-")
+        plat = machine_data.get("platform", "-")
+        host = machine_data.get("hostname", "-")
+        print(f"Nền tảng hiện tại: {plat}\nHostname hiện tại: {host}")
         
-        print(f"Nền tảng hiện tại: {current_platform}")
-        print(f"Hostname hiện tại: {current_hostname}")
-        
-        if current_platform == "-" or not current_platform or current_hostname == "-" or not current_hostname:
+        if not plat or plat == "-" or not host or host == "-":
             print("Máy chưa có đầy đủ thông tin, yêu cầu nhập...")
             need_input = True
         else:
-            static_info["platform"] = current_platform
-            static_info["hostname"] = current_hostname
+            static_info["platform"] = plat
+            static_info["hostname"] = host
     
     if need_input:
-        user_input = show_input_dialog(current_hostname_system)
+        user_input = show_input_dialog(current_hostname)
         static_info["platform"] = user_input["platform"]
         static_info["hostname"] = user_input["hostname"]
-        
         if exists:
-            update_info_to_server(
-                static_info["machine_id"], 
-                user_input["platform"],
-                user_input["hostname"]
-            )
+            update_info_to_server(static_info["machine_id"], 
+                                user_input["platform"], user_input["hostname"])
     
-    # Tự động enable startup mỗi lần khởi động
     enable_autostart()
-
-    print(f"Hostname: {static_info['hostname']}")
-    print(f"Platform: {static_info['platform']}")
+    print(f"Hostname: {static_info['hostname']}\nPlatform: {static_info['platform']}")
 
     _connect_with_backoff(API_URL)
     print("Starting system monitor... (Ctrl+C to stop)")
@@ -627,13 +398,8 @@ def main():
 
             dynamic_data = get_dynamic_info()
             dynamic_data["machine_id"] = static_info["machine_id"]
-
             exists, _ = check_machine_exists(static_info["machine_id"])
-
-            if exists:
-                data_to_send = dynamic_data
-            else:
-                data_to_send = {**static_info, **dynamic_data}
+            data_to_send = dynamic_data if exists else {**static_info, **dynamic_data}
 
             try:
                 sio.emit("system_update", data_to_send, namespace="/")
