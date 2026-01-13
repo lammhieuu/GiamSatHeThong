@@ -1,8 +1,0 @@
-Package: lcit-monitor-agent
-Version: 1.0
-Section: utils
-Priority: optional
-Architecture: all
-Depends: python3
-Maintainer: Dat Nguyen Tien <nguyentiendat1@laocai.gov.vn>
-Description: LCIT Monitor Agent.
